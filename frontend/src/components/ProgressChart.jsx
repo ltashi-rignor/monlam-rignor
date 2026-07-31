@@ -8,11 +8,11 @@ const KEYS = [
   ['vocabulary_score', bo.progress.vocabulary],
 ]
 
-export default function ProgressChart({ progress }) {
+export default function ProgressChart({ progress, compact = false }) {
   if (!progress) return <div className="empty tibetan">{bo.loading}</div>
 
   return (
-    <div className="panel tibetan">
+    <div className="panel tibetan" lang="bo">
       <h3 style={{ marginTop: 0 }}>{bo.progress.skills}</h3>
       <div className="progress-bars">
         {KEYS.map(([key, label]) => {
@@ -29,12 +29,14 @@ export default function ProgressChart({ progress }) {
         })}
       </div>
 
-      {progress.learning_graph?.next_focus && (
-        <div style={{ marginTop: 18 }} dir="ltr">
+      {!compact && !!progress.learning_graph?.next_focus?.length && (
+        <div style={{ marginTop: 18 }}>
           <h4>{bo.progress.nextFocus}</h4>
           <ul>
             {(progress.learning_graph.next_focus || []).map((item, i) => (
-              <li key={i}>{item}</li>
+              <li key={i} dir="ltr">
+                {item}
+              </li>
             ))}
           </ul>
         </div>

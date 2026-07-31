@@ -132,30 +132,32 @@ def normalize_grammar_result(result: dict[str, Any], fallback_text: str) -> dict
             result.get("practice_questions"), limit=MAX_LIST_ITEM, max_items=4
         ),
         "retrieved_sources": result.get("retrieved_sources") or [],
+        "summary": _clamp(result.get("summary"), 220),
+        "praise": _clamp(result.get("praise"), 180),
     }
 
 
 async def run_grammar(session: AsyncSession, text: str) -> dict[str, Any]:
     retriever = get_retriever()
     # Prefer handbook pages about particles / questions when query is short
-    query = text
-    if len(text.strip()) < 40:
-        query = f"{text}\nTibetan question particle སམ grammar"
-    retrieved = await retriever.retrieve_grammar(session, query, top_k=4)
+    query = text.strip()
+    if len(query) < 40:
+        query = f"{query}\nབོད་ཡིག་བརྡ་སྤྲོད། ཕྲད། སམ། རྣམ་དབྱེ། ཞེ་ས།"
+    retrieved = await retriever.retrieve_grammar(session, query, top_k=5)
     llm = get_llm()
     result = llm.complete_json(
         prompts.grammar_system(),
         prompts.grammar_user(text, retrieved),
-        max_tokens=2500,
+        max_tokens=3200,
         retries=1,
     )
     result["retrieved_sources"] = [
         {
             "page_number": r.get("page_number"),
-            "title": r.get("title"),
+            "title": r.get("title") or "བོད་ཡིག་བརྡ་སྤྲོད་དཔེ་དེབ།",
             "source_name": r.get("source_name"),
             "score": float(r["score"]) if r.get("score") is not None else None,
-            "excerpt": (r.get("content") or "")[:400],
+            "excerpt": (r.get("content") or "")[:280],
         }
         for r in retrieved
     ]
@@ -164,4 +166,6 @@ async def run_grammar(session: AsyncSession, text: str) -> dict[str, Any]:
     result.setdefault("corrected_version", text)
     result.setdefault("related_rules", [])
     result.setdefault("practice_questions", [])
+    result.setdefault("summary", None)
+    result.setdefault("praise", None)
     return normalize_grammar_result(result, text)

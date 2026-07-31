@@ -5,16 +5,25 @@ import { useAuthStore } from '../store/authStore'
 const links = [
   { to: '/dashboard', label: bo.nav.dashboard },
   { to: '/learning-path', label: bo.nav.learningPath },
+  { to: '/alphabet', label: bo.nav.alphabet },
+  { to: '/flashcards', label: bo.nav.flashcards },
+  { to: '/lessons', label: bo.nav.lessons },
+  { to: '/handwriting', label: bo.nav.handwriting },
+  { to: '/tutor', label: bo.nav.tutor },
   { to: '/grammar', label: bo.nav.grammar },
   { to: '/essay', label: bo.nav.essay },
   { to: '/practice', label: bo.nav.practice },
   { to: '/progress', label: bo.nav.progress },
+  { to: '/onboarding', label: bo.nav.profile },
 ]
 
 export default function AppLayout() {
-  const { user, logout, loading } = useAuthStore()
+  const user = useAuthStore((s) => s.user)
+  const loading = useAuthStore((s) => s.loading)
+  const logout = useAuthStore((s) => s.logout)
 
-  if (loading) return <div className="empty tibetan">{bo.loading}</div>
+  // Keep shell visible once we have a user — avoid full blank flash on remounts
+  if (loading && !user) return <div className="empty tibetan">{bo.loading}</div>
   if (!user) return <Navigate to="/login" replace />
   if (!user.profile_complete) return <Navigate to="/onboarding" replace />
 

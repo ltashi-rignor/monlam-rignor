@@ -9,7 +9,18 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
-from app.api import auth, essay, grammar, planner, practice, progress, recommendations
+from app.api import (
+    auth,
+    dashboard,
+    essay,
+    grammar,
+    modules,
+    planner,
+    practice,
+    progress,
+    recommendations,
+    tutor,
+)
 from app.core.config import get_settings
 from app.core.security import get_current_user_id
 from app.database.session import Base, engine
@@ -58,12 +69,15 @@ def create_app() -> FastAPI:
     # All domain routers are JWT-protected at the route level via Depends(get_current_user_id).
     # Auth request/verify endpoints remain public.
     app.include_router(auth.router, prefix="/api")
+    app.include_router(dashboard.router, prefix="/api")
     app.include_router(planner.router, prefix="/api")
     app.include_router(grammar.router, prefix="/api")
     app.include_router(essay.router, prefix="/api")
     app.include_router(practice.router, prefix="/api")
     app.include_router(progress.router, prefix="/api")
     app.include_router(recommendations.router, prefix="/api")
+    app.include_router(modules.router, prefix="/api")
+    app.include_router(tutor.router, prefix="/api")
 
     @app.get("/api/health")
     async def health():

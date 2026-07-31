@@ -75,6 +75,48 @@ class LLMService:
             )
         return text.strip()
 
+    def complete_messages(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        max_tokens: int = 1024,
+        temperature: float = 0.5,
+    ) -> str:
+        payload = {
+            "model_name": self.model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+        headers = {
+            "Content-Type": "application/json",
+            "X-API-Key": self.api_key,
+        }
+        try:
+            with httpx.Client(timeout=120.0) as client:
+                response = client.post(self.api_url, headers=headers, json=payload)
+        except httpx.RequestError as exc:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Monlam Melong request failed: {exc}",
+            ) from exc
+
+        if response.status_code >= 400:
+            detail = response.text[:500]
+            raise HTTPException(
+                status_code=502,
+                detail=f"Monlam Melong error ({response.status_code}): {detail}",
+            )
+
+        data = response.json()
+        text = extract_assistant_text(data)
+        if not text:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Monlam Melong returned an empty response: {str(data)[:400]}",
+            )
+        return text.strip()
+
     def complete_json(
         self,
         system: str,

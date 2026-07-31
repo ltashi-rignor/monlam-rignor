@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { api, setToken } from '../api/client'
+import { api, clearApiCache, setToken } from '../api/client'
+import { useModuleProgressStore } from './moduleProgressStore'
 
 export const useAuthStore = create((set, get) => ({
   user: null,
@@ -21,8 +22,10 @@ export const useAuthStore = create((set, get) => ({
   async loginWithOtp(email, code) {
     const res = await api.verifyOtp(email, code)
     setToken(res.access_token)
+    clearApiCache()
+    useModuleProgressStore.getState().reset()
     const user = await api.me()
-    set({ user })
+    set({ user, loading: false })
     return res
   },
   async refreshUser() {
@@ -32,6 +35,8 @@ export const useAuthStore = create((set, get) => ({
   },
   logout() {
     setToken(null)
-    set({ user: null })
+    clearApiCache()
+    useModuleProgressStore.getState().reset()
+    set({ user: null, loading: false })
   },
 }))

@@ -59,6 +59,26 @@ class LearningPlanOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class LessonStatusUpdate(BaseModel):
+    status: str = Field(pattern="^(pending|in_progress|completed)$")
+
+
+class LessonOut(BaseModel):
+    id: UUID
+    title: str
+    content: str | None = None
+    lesson_type: str
+    week_number: int
+    order_index: int
+    status: str
+    plan_id: UUID
+    goals: list[Any] = []
+    week_focus: str | None = None
+    estimated_minutes: int | None = None
+
+    model_config = {"from_attributes": True}
+
+
 # ---------- Grammar ----------
 class GrammarCheckRequest(BaseModel):
     text: str = Field(min_length=1)
@@ -81,6 +101,21 @@ class GrammarCheckResponse(BaseModel):
     related_rules: list[str] = []
     practice_questions: list[str] = []
     retrieved_sources: list[dict[str, Any]] = []
+    summary: str | None = None
+    praise: str | None = None
+
+
+class RecentMistakeOut(BaseModel):
+    id: UUID
+    mistake_type: str
+    original: str
+    correction: str
+    explanation: str | None = None
+    related_rule: str | None = None
+    source_ref: str | None = None
+    created_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
 
 
 # ---------- Essay ----------

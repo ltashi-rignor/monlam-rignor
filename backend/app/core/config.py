@@ -55,6 +55,10 @@ class Settings(BaseSettings):
         return f"{self.monlam_api_base.rstrip('/')}/api/v1/ai/chat"
 
     @property
+    def monlam_tts_url(self) -> str:
+        return f"{self.monlam_api_base.rstrip('/')}/api/v1/text-to-speech/"
+
+    @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
