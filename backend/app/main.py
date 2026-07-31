@@ -13,6 +13,7 @@ from app.api import (
     auth,
     dashboard,
     essay,
+    games,
     grammar,
     modules,
     planner,
@@ -78,6 +79,7 @@ def create_app() -> FastAPI:
     app.include_router(recommendations.router, prefix="/api")
     app.include_router(modules.router, prefix="/api")
     app.include_router(tutor.router, prefix="/api")
+    app.include_router(games.router, prefix="/api")
 
     @app.get("/api/health")
     async def health():

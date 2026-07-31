@@ -7,6 +7,7 @@ import Essay from './pages/Essay'
 import Flashcards from './pages/Flashcards'
 import Grammar from './pages/Grammar'
 import Handwriting from './pages/Handwriting'
+import LetterParty from './pages/LetterParty'
 import LearningPath from './pages/LearningPath'
 import LessonDetail from './pages/LessonDetail'
 import Lessons from './pages/Lessons'
@@ -45,6 +46,7 @@ export default function App() {
           <Route path="/lessons" element={<Lessons />} />
           <Route path="/lessons/:id" element={<LessonDetail />} />
           <Route path="/handwriting" element={<Handwriting />} />
+          <Route path="/letter-party" element={<LetterParty />} />
           <Route path="/tutor" element={<Tutor />} />
           <Route path="/grammar" element={<Grammar />} />
           <Route path="/essay" element={<Essay />} />

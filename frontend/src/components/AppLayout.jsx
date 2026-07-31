@@ -9,6 +9,7 @@ const links = [
   { to: '/flashcards', label: bo.nav.flashcards },
   { to: '/lessons', label: bo.nav.lessons },
   { to: '/handwriting', label: bo.nav.handwriting },
+  { to: '/letter-party', label: bo.nav.letterParty },
   { to: '/tutor', label: bo.nav.tutor },
   { to: '/grammar', label: bo.nav.grammar },
   { to: '/essay', label: bo.nav.essay },

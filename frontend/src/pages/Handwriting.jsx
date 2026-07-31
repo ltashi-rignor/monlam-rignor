@@ -1,179 +1,228 @@
-import { useEffect, useRef, useState } from 'react'
+/**
+ * Handwriting — TraceCore practice UI (KharagEdition stroke data).
+ */
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CONSONANTS } from '../data/tibetan'
+import { getStrokeLesson } from '../data/strokeLessons'
+import traceDoc from '../data/tibetanTraceLetters.json'
+import { normalizeDoc, normalizeBrush, TraceEngine } from '../lib/traceCore'
 import { bo } from '../i18n/bo'
+
+const TRACE_LETTERS = normalizeDoc(traceDoc)
+const TRACE_BRUSH = normalizeBrush(traceDoc.brush)
+const BY_GLYPH = Object.fromEntries(TRACE_LETTERS.map((L) => [L.glyph, L]))
+
+function indexForGlyph(glyph) {
+  const i = TRACE_LETTERS.findIndex((L) => L.glyph === glyph)
+  return i >= 0 ? i : 0
+}
 
 export default function Handwriting() {
   const [idx, setIdx] = useState(0)
-  const [showGuide, setShowGuide] = useState(true)
+  const [strokeI, setStrokeI] = useState(0)
+  const [strokeN, setStrokeN] = useState(1)
+  const [finished, setFinished] = useState(false)
+  const [ready, setReady] = useState(false)
+  const [demoing, setDemoing] = useState(false)
+
   const canvasRef = useRef(null)
-  const drawing = useRef(false)
-  const strokes = useRef([])
-  const current = useRef([])
+  const engineRef = useRef(null)
+  const wrapRef = useRef(null)
 
   const letter = CONSONANTS[idx]
+  const lesson = useMemo(() => getStrokeLesson(letter.id), [letter.id])
+  const traceLetter = BY_GLYPH[letter.letter] || TRACE_LETTERS[indexForGlyph(letter.letter)]
+  const tip = lesson.steps[Math.min(strokeI, Math.max(0, lesson.steps.length - 1))]
+  const stepLabel = finished
+    ? bo.modules.handLetterDone
+    : `${bo.modules.handStroke} ${Math.min(strokeI + 1, strokeN)}/${strokeN}`
 
-  const redraw = () => {
-    const c = canvasRef.current
-    if (!c) return
-    const ctx = c.getContext('2d')
-    const dpr = window.devicePixelRatio || 1
-    const w = c.width / dpr
-    const h = c.height / dpr
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    ctx.clearRect(0, 0, w, h)
-
-    if (showGuide) {
-      ctx.fillStyle = 'rgba(26, 107, 118, 0.12)'
-      ctx.font = `${Math.floor(h * 0.72)}px "Monlam Uni OuChan2", "Noto Serif Tibetan", serif`
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      ctx.fillText(letter.letter, w / 2, h / 2 + 8)
-    }
-
-    ctx.strokeStyle = '#07161a'
-    ctx.lineWidth = 3.5
-    ctx.lineCap = 'round'
-    ctx.lineJoin = 'round'
-    for (const s of strokes.current) {
-      if (s.length < 2) continue
-      ctx.beginPath()
-      ctx.moveTo(s[0].x, s[0].y)
-      for (let i = 1; i < s.length; i++) ctx.lineTo(s[i].x, s[i].y)
-      ctx.stroke()
-    }
-    if (current.current.length > 1) {
-      ctx.beginPath()
-      ctx.moveTo(current.current[0].x, current.current[0].y)
-      for (let i = 1; i < current.current.length; i++) {
-        ctx.lineTo(current.current[i].x, current.current[i].y)
-      }
-      ctx.stroke()
-    }
-  }
+  const fit = useCallback(() => {
+    const engine = engineRef.current
+    const wrap = wrapRef.current
+    if (!engine || !wrap) return
+    // Size drawing buffer from the square stage frame (CSS owns the box)
+    const rect = wrap.getBoundingClientRect()
+    const pad = 16
+    const side = Math.max(220, Math.floor(Math.min(rect.width, rect.height) - pad))
+    engine.resize(side)
+  }, [])
 
   useEffect(() => {
-    const c = canvasRef.current
-    if (!c) return
-    const dpr = window.devicePixelRatio || 1
-    const rect = c.parentElement.getBoundingClientRect()
-    const size = Math.min(560, Math.max(240, Math.floor(rect.width) - 8))
-    c.width = size * dpr
-    c.height = size * dpr
-    c.style.width = `${size}px`
-    c.style.height = `${size}px`
-    strokes.current = []
-    current.current = []
-    redraw()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idx])
+    const canvas = canvasRef.current
+    if (!canvas) return undefined
+    const engine = new TraceEngine(canvas, {
+      sfx: false,
+      haptics: true,
+      ghost: 'rgba(13, 61, 69, 0.14)',
+      accent: '#c47a16',
+      inkFrom: '#1a6b76',
+      inkTo: '#0d3d45',
+      guide: 'rgba(7, 22, 26, 0.38)',
+      onStrokeChange: (si, total, done) => {
+        setStrokeI(Math.min(si, Math.max(0, total - 1)))
+        setStrokeN(total)
+        setFinished(!!done)
+        if (!done) setDemoing(false)
+      },
+      onComplete: () => {
+        setFinished(true)
+        setDemoing(false)
+      },
+    })
+    engine.setBrush(TRACE_BRUSH)
+    engineRef.current = engine
+    setReady(true)
+    fit()
+    const onResize = () => fit()
+    window.addEventListener('resize', onResize)
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => fit()) : null
+    if (ro && wrapRef.current) ro.observe(wrapRef.current)
+    return () => {
+      window.removeEventListener('resize', onResize)
+      ro?.disconnect()
+      engine.destroy()
+      engineRef.current = null
+    }
+  }, [fit])
 
   useEffect(() => {
-    redraw()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showGuide])
+    const engine = engineRef.current
+    if (!engine || !traceLetter) return
+    engine.setLetter(traceLetter)
+    setStrokeI(0)
+    setStrokeN(traceLetter.strokes.length)
+    setFinished(false)
+    setDemoing(false)
+    fit()
+  }, [letter.letter, traceLetter, fit])
 
-  const pos = (e) => {
-    const c = canvasRef.current
-    const rect = c.getBoundingClientRect()
-    const t = e.touches ? e.touches[0] : e
-    return { x: t.clientX - rect.left, y: t.clientY - rect.top }
-  }
-
-  const start = (e) => {
-    e.preventDefault()
-    drawing.current = true
-    current.current = [pos(e)]
-  }
-  const move = (e) => {
-    if (!drawing.current) return
-    e.preventDefault()
-    current.current.push(pos(e))
-    redraw()
-  }
-  const end = () => {
-    if (!drawing.current) return
-    drawing.current = false
-    if (current.current.length > 1) strokes.current.push(current.current)
-    current.current = []
-    redraw()
+  const goLetter = (delta) => {
+    setIdx((i) => (i + delta + CONSONANTS.length) % CONSONANTS.length)
   }
 
-  const clearAll = () => {
-    strokes.current = []
-    current.current = []
-    redraw()
+  const reset = () => {
+    engineRef.current?.reset()
+    setFinished(false)
+    setStrokeI(0)
+    setDemoing(false)
   }
-  const undo = () => {
-    strokes.current.pop()
-    redraw()
+
+  const playDemo = () => {
+    setDemoing(true)
+    setFinished(false)
+    engineRef.current?.demo()
   }
-  const nextLetter = () => setIdx((i) => (i + 1) % CONSONANTS.length)
 
   return (
-    <div className="module-page tibetan">
-      <header className="page-header">
-        <div>
+    <div className="module-page tibetan hand-page">
+      <header className="hand-page-header">
+        <div className="hand-page-heading">
           <p className="module-eyebrow">{bo.modules.handEyebrow}</p>
           <h1>{bo.modules.handTitle}</h1>
-          <p>{bo.modules.handSub}</p>
         </div>
+        <p className="hand-page-sub" dir="ltr">
+          Trace each stroke · watch the demo when you need help
+        </p>
       </header>
 
-      <div className="handwriting-layout">
-        <div>
-          <p className="muted" dir="ltr">
-            {letter.wylie} · {letter.group}
-          </p>
-          <div className="panel handwriting-canvas-wrap">
+      <div className="hand-studio">
+        <section className="hand-practice" aria-label="Practice">
+          <div className="hand-identity">
+            <div key={letter.letter} className="hand-identity-glyph tibetan">
+              {letter.letter}
+            </div>
+            <div className="hand-identity-meta">
+              <p className="hand-identity-wylie" dir="ltr">
+                {letter.wylie}
+              </p>
+              <p className="hand-identity-count" dir="ltr">
+                {idx + 1} / {CONSONANTS.length}
+              </p>
+              <p className="hand-identity-step">{stepLabel}</p>
+            </div>
+          </div>
+
+          <div className="hand-strokebar" aria-hidden>
+            {Array.from({ length: strokeN }, (_, k) => (
+              <span
+                key={k}
+                className={
+                  'hand-sdot' +
+                  (finished || k < strokeI ? ' is-done' : k === strokeI ? ' is-now' : '')
+                }
+              />
+            ))}
+          </div>
+
+          <div
+            className={'hand-stage' + (finished ? ' is-done' : '') + (demoing ? ' is-demo' : '')}
+            ref={wrapRef}
+          >
             <canvas
               ref={canvasRef}
-              onMouseDown={start}
-              onMouseMove={move}
-              onMouseUp={end}
-              onMouseLeave={end}
-              onTouchStart={start}
-              onTouchMove={move}
-              onTouchEnd={end}
-              className="handwriting-canvas"
+              className="hand-trace-canvas"
+              aria-label={`${letter.letter} handwriting practice`}
             />
-          </div>
-        </div>
-
-        <aside className="panel handwriting-aside">
-          <p className="muted">{bo.modules.reference}</p>
-          <div className="hand-ref-letter tibetan">{letter.letter}</div>
-          <div dir="ltr" style={{ fontSize: '1.4rem', marginTop: 8 }}>
-            {letter.latin}
+            {!ready && <p className="muted hand-loading">…</p>}
           </div>
 
-          <label className="hand-toggle">
-            <span>{bo.modules.showGuide}</span>
-            <input
-              type="checkbox"
-              checked={showGuide}
-              onChange={(e) => setShowGuide(e.target.checked)}
-            />
-          </label>
+          <p className="hand-trace-hint">
+            {finished
+              ? bo.modules.handLetterDone
+              : demoing
+                ? bo.modules.handReplay
+                : bo.modules.handDrawPrompt}
+          </p>
 
-          <div className="module-actions" style={{ marginTop: 12 }}>
-            <button type="button" className="btn btn-ghost" onClick={undo}>
-              {bo.modules.undo}
+          <div className="hand-toolbar">
+            <button type="button" className="btn btn-ghost" onClick={reset}>
+              {bo.modules.handRestart}
             </button>
-            <button type="button" className="btn btn-ghost" onClick={clearAll}>
-              {bo.modules.clear}
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={playDemo}
+              disabled={!ready}
+            >
+              {bo.modules.handReplay}
             </button>
+            <div className="hand-toolbar-nav">
+              <button type="button" className="btn btn-ghost" onClick={() => goLetter(-1)}>
+                {bo.modules.handPrevLetter}
+              </button>
+              <button type="button" className="btn btn-ghost" onClick={() => goLetter(1)}>
+                {bo.modules.nextLetter}
+              </button>
+            </div>
           </div>
-          <button
-            type="button"
-            className="btn btn-primary"
-            style={{ width: '100%', marginTop: 12 }}
-            onClick={() => {
-              clearAll()
-              nextLetter()
-            }}
+        </section>
+
+        <aside className="hand-coach" aria-label="Stroke guide">
+          <p className="hand-coach-label">{bo.modules.fynnDiagram}</p>
+          <a
+            className="hand-fynn-link"
+            href="https://sites.google.com/view/chrisfynn/home/tibetanscriptfonts/howtowritethetibetanscript"
+            target="_blank"
+            rel="noreferrer"
           >
-            {bo.modules.nextLetter}
-          </button>
+            <img
+              className="hand-fynn-img"
+              src={lesson.image}
+              alt=""
+              key={lesson.image}
+            />
+          </a>
+
+          <div className="hand-coach-tip">
+            <p className="module-eyebrow">{stepLabel}</p>
+            <p className="hand-tip-bo">
+              {finished ? bo.modules.handPracticeTip : tip?.bo || bo.modules.handDrawPrompt}
+            </p>
+            <p className="hand-tip-en" dir="ltr">
+              {finished ? bo.modules.handPracticeTipEn : tip?.en || ''}
+            </p>
+          </div>
         </aside>
       </div>
     </div>
