@@ -1,0 +1,66 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: monlam-rignor-db
+    environment:
+      POSTGRES_USER: monlam
+      POSTGRES_PASSWORD: monlam
+      POSTGRES_DB: monlam_rignor
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U monlam -d monlam_rignor"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: monlam-rignor-mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: monlam-rignor-backend
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://monlam:monlam@db:5432/monlam_rignor
+      DATABASE_URL_SYNC: postgresql://monlam:monlam@db:5432/monlam_rignor
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - ./data:/data
+      - ./classical-tibetan-grammar-handbook_compress.pdf:/data/knowledge/classical-tibetan-grammar-handbook_compress.pdf:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: monlam-rignor-frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      VITE_API_URL: http://localhost:8000
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
