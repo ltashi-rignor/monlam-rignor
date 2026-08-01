@@ -24,7 +24,7 @@ router = APIRouter(prefix="/practice", tags=["practice"])
 
 def _practice_out(record: PracticeHistory) -> PracticeHistory:
     """Ensure blanks don't leak answers on any returned session (including older ones)."""
-    payload = sanitize_practice_exercises(dict(record.exercises_json or {}))
+    payload = sanitize_practice_exercises(dict(record.exercises_json or {}), fill_bank=False)
     if payload != (record.exercises_json or {}):
         record.exercises_json = payload
         flag_modified(record, "exercises_json")

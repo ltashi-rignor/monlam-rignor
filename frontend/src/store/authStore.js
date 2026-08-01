@@ -1,12 +1,18 @@
 import { create } from 'zustand'
-import { api, clearApiCache, setRefreshToken, setSessionTokens, setToken } from '../api/client'
+import {
+  api,
+  clearApiCache,
+  hasSessionHint,
+  markSessionActive,
+  setSessionTokens,
+  setToken,
+} from '../api/client'
 import { useModuleProgressStore } from './moduleProgressStore'
 
 async function finishSession(res) {
-  setSessionTokens({
-    access_token: res.access_token,
-    refresh_token: res.refresh_token,
-  })
+  // Cookies are set by the API response; avoid persisting JWTs in localStorage.
+  setSessionTokens({ access_token: res?.access_token })
+  markSessionActive()
   clearApiCache()
   useModuleProgressStore.getState().reset()
   const user = await api.me()
@@ -21,9 +27,6 @@ function bindSessionListeners(get) {
   window.addEventListener('mr:unauthorized', () => {
     get().logout()
   })
-  window.addEventListener('storage', (e) => {
-    if (e.key === 'mr_token' && !e.newValue) get().logout()
-  })
 }
 
 export const useAuthStore = create((set, get) => ({
@@ -31,19 +34,25 @@ export const useAuthStore = create((set, get) => ({
   loading: true,
   async bootstrap() {
     bindSessionListeners(get)
-    const token = localStorage.getItem('mr_token')
-    const refresh = localStorage.getItem('mr_refresh')
-    if (!token && !refresh) {
-      set({ user: null, loading: false })
-      return
+    const tryMe = async () => {
+      const user = await api.me()
+      markSessionActive()
+      set({ user, loading: false })
     }
     try {
-      const user = await api.me()
-      set({ user, loading: false })
+      await tryMe()
     } catch {
-      setToken(null)
-      setRefreshToken(null)
-      set({ user: null, loading: false })
+      if (!hasSessionHint()) {
+        set({ user: null, loading: false })
+        return
+      }
+      try {
+        await api.refresh()
+        await tryMe()
+      } catch {
+        setToken(null)
+        set({ user: null, loading: false })
+      }
     }
   },
   async loginWithPassword(identifier, password) {
@@ -64,16 +73,12 @@ export const useAuthStore = create((set, get) => ({
     return user
   },
   async logout() {
-    const refresh = localStorage.getItem('mr_refresh')
-    if (refresh) {
-      try {
-        await api.logout(refresh)
-      } catch {
-        /* ignore */
-      }
+    try {
+      await api.logout()
+    } catch {
+      /* ignore */
     }
     setToken(null)
-    setRefreshToken(null)
     clearApiCache()
     useModuleProgressStore.getState().reset()
     set({ user: null, loading: false })

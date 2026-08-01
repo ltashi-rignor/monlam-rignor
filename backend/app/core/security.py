@@ -6,9 +6,10 @@ import hmac
 import secrets
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from app.core.auth_cookies import ACCESS_COOKIE
 from app.core.config import get_settings
 
 security = HTTPBearer(auto_error=False)
@@ -71,16 +72,8 @@ def decode_token(token: str) -> dict[str, Any]:
         ) from exc
 
 
-async def get_current_user_id(
-    credentials: HTTPAuthorizationCredentials | None = Depends(security),
-) -> UUID:
-    if credentials is None or credentials.scheme.lower() != "bearer":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    payload = decode_token(credentials.credentials)
+def _user_id_from_access_token(token: str) -> UUID:
+    payload = decode_token(token)
     if payload.get("purpose") == "setup":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -102,3 +95,23 @@ async def get_current_user_id(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid user id"
         ) from exc
+
+
+async def get_current_user_id(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+) -> UUID:
+    token: str | None = None
+    if credentials is not None and credentials.scheme.lower() == "bearer":
+        token = credentials.credentials
+    if not token:
+        cookie = request.cookies.get(ACCESS_COOKIE)
+        if cookie:
+            token = cookie
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return _user_id_from_access_token(token)

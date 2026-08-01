@@ -4,18 +4,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CONSONANTS } from '../data/tibetan'
 import { getStrokeLesson } from '../data/strokeLessons'
-import traceDoc from '../data/tibetanTraceLetters.json'
-import { normalizeDoc, normalizeBrush, TraceEngine } from '../lib/traceCore'
+import { TraceEngine } from '../lib/traceCore'
+import { loadTraceData } from '../lib/loadTraceData'
 import { useI18n } from '../i18n/useI18n'
-
-const TRACE_LETTERS = normalizeDoc(traceDoc)
-const TRACE_BRUSH = normalizeBrush(traceDoc.brush)
-const BY_GLYPH = Object.fromEntries(TRACE_LETTERS.map((L) => [L.glyph, L]))
-
-function indexForGlyph(glyph) {
-  const i = TRACE_LETTERS.findIndex((L) => L.glyph === glyph)
-  return i >= 0 ? i : 0
-}
 
 export default function Handwriting() {
   const { t } = useI18n()
@@ -26,6 +17,7 @@ export default function Handwriting() {
   const [finished, setFinished] = useState(false)
   const [ready, setReady] = useState(false)
   const [demoing, setDemoing] = useState(false)
+  const [tracePack, setTracePack] = useState(null)
 
   const canvasRef = useRef(null)
   const engineRef = useRef(null)
@@ -33,17 +25,34 @@ export default function Handwriting() {
 
   const letter = CONSONANTS[idx]
   const lesson = useMemo(() => getStrokeLesson(letter.id), [letter.id])
-  const traceLetter = BY_GLYPH[letter.letter] || TRACE_LETTERS[indexForGlyph(letter.letter)]
+  const traceLetter = useMemo(() => {
+    if (!tracePack) return null
+    return (
+      tracePack.byGlyph[letter.letter] ||
+      tracePack.letters.find((L) => L.glyph === letter.letter) ||
+      tracePack.letters[0] ||
+      null
+    )
+  }, [tracePack, letter.letter])
   const tip = lesson.steps[Math.min(strokeI, Math.max(0, lesson.steps.length - 1))]
   const stepLabel = finished
     ? t.modules.handLetterDone
     : `${t.modules.handStroke} ${Math.min(strokeI + 1, strokeN)}/${strokeN}`
 
+  useEffect(() => {
+    let cancelled = false
+    loadTraceData().then((data) => {
+      if (!cancelled) setTracePack(data)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const fit = useCallback(() => {
     const engine = engineRef.current
     const wrap = wrapRef.current
     if (!engine || !wrap) return
-    // Size drawing buffer from the square stage frame (CSS owns the box)
     const rect = wrap.getBoundingClientRect()
     const pad = 16
     const side = Math.max(220, Math.floor(Math.min(rect.width, rect.height) - pad))
@@ -52,7 +61,7 @@ export default function Handwriting() {
 
   useEffect(() => {
     const canvas = canvasRef.current
-    if (!canvas) return undefined
+    if (!canvas || !tracePack) return undefined
     const engine = new TraceEngine(canvas, {
       sfx: false,
       haptics: true,
@@ -72,7 +81,7 @@ export default function Handwriting() {
         setDemoing(false)
       },
     })
-    engine.setBrush(TRACE_BRUSH)
+    engine.setBrush(tracePack.brush)
     engineRef.current = engine
     setReady(true)
     fit()
@@ -85,8 +94,9 @@ export default function Handwriting() {
       ro?.disconnect()
       engine.destroy()
       engineRef.current = null
+      setReady(false)
     }
-  }, [fit])
+  }, [fit, tracePack])
 
   useEffect(() => {
     const engine = engineRef.current

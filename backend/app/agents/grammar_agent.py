@@ -301,10 +301,16 @@ async def run_grammar(
         apply_simple_corrections,
         scan_simple_mistakes,
     )
+    from app.rag.retriever import get_retriever
     from app.services.claude_llm import claude_configured, get_grammar_llm
 
-    _ = session
     rule_mistakes = scan_simple_mistakes(text, max_items=14)
+
+    retrieved: list[dict[str, Any]] = []
+    try:
+        retrieved = await get_retriever().retrieve_grammar(session, text, top_k=4)
+    except Exception:
+        retrieved = []
 
     llm_mistakes: list[dict[str, Any]] = []
     praise = None
@@ -322,7 +328,7 @@ async def run_grammar(
         )
         llm_result = await llm.complete_json_async(
             prompts.grammar_system(),
-            prompts.grammar_user(text, [], profile),
+            prompts.grammar_user(text, retrieved, profile),
             max_tokens=3500,
             temperature=0.1,
             retries=1,

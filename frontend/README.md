@@ -1,16 +1,49 @@
-# React + Vite
+# Frontend — Monlam Rignor
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React + Vite SPA for Tibetan learning (dashboard, alphabet, flashcards, practice, tutor, CMS site).
 
-Currently, two official plugins are available:
+## Develop
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+npm install
+npm run dev
+```
 
-## React Compiler
+Opens http://localhost:5173. Vite proxies `/api` to the backend (`:8000`) so **httpOnly auth cookies** work on the same origin.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Build
 
-## Expanding the Oxlint configuration
+```bash
+npm run build
+npm run preview   # optional local preview of the production build
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+Production Docker image uses `Dockerfile.prod` + `nginx.conf` (CSP and security headers; `/api` proxied to the backend service).
+
+## Layout
+
+| Path | Role |
+|------|------|
+| `src/pages/` | App routes (practice, lessons, grammar, story, CMS, …) |
+| `src/components/` | Shared UI (`OfflineBanner`, `WorkingProgress`, `BrandLogo`, …) |
+| `src/api/client.js` | Fetch wrapper — `credentials: 'include'`, cookie session, no JWT in `localStorage` |
+| `src/store/` | Zustand auth + module progress |
+| `src/i18n/` | `bo.js` / `en.js` |
+| `src/lib/` | Trace engine, game helpers, lazy `loadTraceData` |
+| `src/data/` | Static curriculum / speak timing helpers |
+
+## Auth (browser)
+
+- Login/register responses set `mr_access` / `mr_refresh` httpOnly cookies
+- Client keeps a session hint in `sessionStorage` only; legacy `localStorage` tokens are scrubbed
+- 401 on protected APIs → cookie refresh → retry, else redirect to login
+
+## Practice UX
+
+- Multiple-choice answers auto-advance to the next item
+- Last item shows **Finish** (`practice.finish`); requires an answer on the current card
+- Reorder drills may include `tokens[]` shown as chips above the options
+
+## i18n
+
+Prefer adding keys to both `en.js` and `bo.js`. CMS home and practice strings include `eyebrow`, `finish`, `pickThenFinish`, etc.

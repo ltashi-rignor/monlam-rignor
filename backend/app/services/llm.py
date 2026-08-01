@@ -57,6 +57,27 @@ class LLMService:
             detail="AI service unavailable. Please try again.",
         )
 
+    def _log_usage(self, data: dict[str, Any], *, where: str) -> None:
+        usage = data.get("usage") if isinstance(data, dict) else None
+        if not isinstance(usage, dict):
+            return
+        prompt = usage.get("prompt_tokens") or usage.get("input_tokens")
+        completion = usage.get("completion_tokens") or usage.get("output_tokens")
+        total = usage.get("total_tokens")
+        if total is None and prompt is not None and completion is not None:
+            try:
+                total = int(prompt) + int(completion)
+            except (TypeError, ValueError):
+                total = None
+        logger.info(
+            "LLM usage model=%s where=%s prompt_tokens=%s completion_tokens=%s total_tokens=%s",
+            self.model,
+            where,
+            prompt,
+            completion,
+            total,
+        )
+
     def _post_sync(self, payload: dict[str, Any], *, timeout: float = 90.0) -> str:
         try:
             with httpx.Client(timeout=timeout) as client:
@@ -72,6 +93,7 @@ class LLMService:
             self._raise_http(response)
 
         data = response.json()
+        self._log_usage(data, where="sync")
         text = extract_assistant_text(data)
         if not text:
             raise HTTPException(
@@ -97,6 +119,7 @@ class LLMService:
             self._raise_http(response)
 
         data = response.json()
+        self._log_usage(data, where="async")
         text = extract_assistant_text(data)
         if not text:
             raise HTTPException(

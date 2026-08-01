@@ -1,10 +1,33 @@
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import { NavLink, Outlet, Navigate, useLocation } from 'react-router-dom'
+import BrandLogo from './BrandLogo'
 import ErrorBoundary from './ErrorBoundary'
 import { useI18n } from '../i18n/useI18n'
 import { useAuthStore } from '../store/authStore'
 
 const DRAWER_MQ = '(max-width: 1024px)'
+
+const EMPTY_OPEN = {
+  home: false,
+  learn: false,
+  practice: false,
+  progress: false,
+  website: false,
+  account: false,
+}
+
+function pathMatchesLink(pathname, link) {
+  if (link.end || link.to === '/') return pathname === link.to
+  return pathname === link.to || pathname.startsWith(`${link.to}/`)
+}
+
+function pathInGroup(pathname, links) {
+  return links.some((l) => pathMatchesLink(pathname, l))
+}
+
+function defaultOpenGroups() {
+  return { ...EMPTY_OPEN }
+}
 
 export default function AppLayout() {
   const { t, lang, setLang, isEn } = useI18n()
@@ -18,21 +41,68 @@ export default function AppLayout() {
   )
   const titleId = useId()
 
-  const links = [
-    { to: '/dashboard', label: t.nav.dashboard },
-    { to: '/learning-path', label: t.nav.learningPath },
-    { to: '/alphabet', label: t.nav.alphabet },
-    { to: '/flashcards', label: t.nav.flashcards },
-    { to: '/lessons', label: t.nav.lessons },
-    { to: '/handwriting', label: t.nav.handwriting },
-    { to: '/letter-party', label: t.nav.letterParty },
-    { to: '/tutor', label: t.nav.tutor },
-    { to: '/grammar', label: t.nav.grammar },
-    { to: '/story', label: t.nav.story || 'སྒྲུང་།' },
-    { to: '/practice', label: t.nav.practice },
-    { to: '/progress', label: t.nav.progress },
-    { to: '/onboarding', label: t.nav.profile },
-  ]
+  const groups = useMemo(
+    () => [
+      {
+        id: 'home',
+        label: t.nav.groupHome,
+        links: [
+          { to: '/dashboard', label: t.nav.dashboard },
+          { to: '/practice', label: t.nav.todayPractice },
+          { to: '/learning-path', label: t.nav.learningPath },
+          { to: '/tutor', label: t.nav.tutor },
+        ],
+      },
+      {
+        id: 'learn',
+        label: t.nav.groupLearn,
+        links: [
+          { to: '/alphabet', label: t.nav.alphabet },
+          { to: '/lessons', label: t.nav.lessons },
+          { to: '/grammar', label: t.nav.grammar },
+          { to: '/story', label: t.nav.story },
+        ],
+      },
+      {
+        id: 'practice',
+        label: t.nav.groupPractice,
+        links: [
+          { to: '/handwriting', label: t.nav.handwriting },
+          { to: '/letter-party', label: t.nav.letterParty },
+          { to: '/flashcards', label: t.nav.flashcards },
+          { to: '/practice', label: t.nav.practice },
+        ],
+      },
+      {
+        id: 'progress',
+        label: t.nav.groupProgress,
+        links: [{ to: '/progress', label: t.nav.learningProgress }],
+      },
+      {
+        id: 'website',
+        label: t.nav.groupWebsite,
+        links: [
+          { to: '/', label: t.cms.nav.home, end: true },
+          { to: '/about', label: t.cms.nav.about },
+          { to: '/programs', label: t.nav.courses },
+          { to: '/features', label: t.cms.nav.features },
+          { to: '/blog', label: t.cms.nav.blog },
+          { to: '/news', label: t.cms.nav.news },
+          { to: '/faq', label: t.cms.nav.faq },
+          { to: '/contact', label: t.cms.nav.contact },
+        ],
+      },
+      {
+        id: 'account',
+        label: t.nav.groupAccount,
+        links: [{ to: '/onboarding', label: t.nav.profile }],
+        showLogout: true,
+      },
+    ],
+    [t],
+  )
+
+  const [openGroups, setOpenGroups] = useState(defaultOpenGroups)
 
   useEffect(() => {
     setNavOpen(false)
@@ -55,10 +125,11 @@ export default function AppLayout() {
   useEffect(() => {
     const mq = window.matchMedia(DRAWER_MQ)
     const onChange = () => {
-      setIsCompact(mq.matches)
-      if (!mq.matches) setNavOpen(false)
+      const compact = mq.matches
+      setIsCompact(compact)
+      if (!compact) setNavOpen(false)
+      setOpenGroups(defaultOpenGroups())
     }
-    onChange()
     mq.addEventListener('change', onChange)
     return () => mq.removeEventListener('change', onChange)
   }, [])
@@ -72,6 +143,14 @@ export default function AppLayout() {
 
   function closeNav() {
     setNavOpen(false)
+  }
+
+  function toggleGroup(id) {
+    setOpenGroups((prev) => {
+      const willOpen = !prev[id]
+      if (!willOpen) return { ...prev, [id]: false }
+      return { ...EMPTY_OPEN, [id]: true }
+    })
   }
 
   return (
@@ -90,7 +169,7 @@ export default function AppLayout() {
           <span />
         </button>
         <div className="app-topbar-brand">
-          <span className="brand">{t.brand}</span>
+          <BrandLogo size="sm" />
         </div>
         <div className="cms-lang app-topbar-lang" role="group" aria-label="Language">
           <button type="button" className={lang === 'bo' ? 'is-active' : ''} onClick={() => setLang('bo')}>
@@ -116,9 +195,9 @@ export default function AppLayout() {
         inert={isCompact && !navOpen ? true : undefined}
       >
         <div className="sidebar-drawer-head">
-          <p id={titleId} className="brand">
-            {t.brand}
-          </p>
+          <div id={titleId} className="sidebar-drawer-brand">
+            <BrandLogo size="sm" />
+          </div>
           <button
             type="button"
             className="app-drawer-close"
@@ -129,24 +208,71 @@ export default function AppLayout() {
           </button>
         </div>
         <div className="brand-block">
-          <p className="brand sidebar-brand-desktop">{t.brand}</p>
-          <p>{t.brandSub}</p>
-          <NavLink to="/" className="sidebar-home-link" onClick={closeNav}>
-            {t.cms.nav.home}
+          <NavLink to="/dashboard" className="brand-logo-link sidebar-brand-desktop" onClick={closeNav}>
+            <BrandLogo size="md" />
           </NavLink>
+          <p className="brand-tagline">{t.brandSub}</p>
         </div>
+
         <nav className="nav-list" aria-label={t.nav.menu}>
-          {links.map((l) => (
-            <NavLink
-              key={l.to}
-              to={l.to}
-              className={({ isActive }) => (isActive ? 'active' : '')}
-              onClick={closeNav}
-            >
-              {l.label}
-            </NavLink>
-          ))}
+          <div className="nav-groups">
+            {groups.map((g) => {
+              const open = Boolean(openGroups[g.id])
+              const activeHere = pathInGroup(location.pathname, g.links)
+              const panelId = `nav-group-${g.id}`
+              return (
+                <div
+                  key={g.id}
+                  className={`nav-group${open ? ' is-open' : ''}${activeHere ? ' has-active' : ''}`}
+                >
+                  <button
+                    type="button"
+                    className="nav-group-toggle"
+                    aria-expanded={open}
+                    aria-controls={panelId}
+                    onClick={() => toggleGroup(g.id)}
+                  >
+                    <span className="nav-group-title">{g.label}</span>
+                    <span className="nav-group-chevron" aria-hidden="true" />
+                  </button>
+                  <div
+                    id={panelId}
+                    className="nav-group-panel"
+                    role="region"
+                    aria-label={g.label}
+                  >
+                    <div className="nav-group-links">
+                      {g.links.map((l) => (
+                        <NavLink
+                          key={`${g.id}:${l.to}`}
+                          to={l.to}
+                          end={Boolean(l.end)}
+                          className={({ isActive }) => (isActive ? 'active' : '')}
+                          onClick={closeNav}
+                        >
+                          {l.label}
+                        </NavLink>
+                      ))}
+                      {g.showLogout ? (
+                        <button
+                          type="button"
+                          className="nav-group-action"
+                          onClick={() => {
+                            closeNav()
+                            logout()
+                          }}
+                        >
+                          {t.signOut}
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </nav>
+
         <div className="sidebar-footer">
           <div className="cms-lang sidebar-lang" role="group" aria-label="Language">
             <button type="button" className={lang === 'bo' ? 'is-active' : ''} onClick={() => setLang('bo')}>
@@ -160,16 +286,6 @@ export default function AppLayout() {
             {user.username ? <strong dir="ltr">@{user.username}</strong> : null}
             <span>{user.email}</span>
           </div>
-          <button
-            type="button"
-            className="btn btn-ghost sidebar-logout"
-            onClick={() => {
-              closeNav()
-              logout()
-            }}
-          >
-            {t.signOut}
-          </button>
         </div>
       </aside>
 

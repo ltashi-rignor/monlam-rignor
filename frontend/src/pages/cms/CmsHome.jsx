@@ -12,7 +12,7 @@ export default function CmsHome() {
   const { t, lang } = useI18n()
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
-  const [stats, setStats] = useState({ learners: 128, letters: 30, grammar_topics: 48, ai_lessons: 12 })
+  const [stats, setStats] = useState(null)
   const [announcements, setAnnouncements] = useState([])
 
   const features = useMemo(
@@ -26,7 +26,10 @@ export default function CmsHome() {
   )
 
   useEffect(() => {
-    api.cmsStats().then(setStats).catch(() => {})
+    api
+      .cmsStats()
+      .then(setStats)
+      .catch(() => setStats(null))
     api.cmsAnnouncements(3).then(setAnnouncements).catch(() => {})
   }, [])
 
@@ -63,24 +66,28 @@ export default function CmsHome() {
       </section>
 
       <div className="cms-wrap">
-        <section className="cms-section cms-stats-row">
-          <div className="cms-stat">
-            <AnimatedCounter value={stats.learners} />
-            <span>{t.cms.home.statLearners}</span>
-          </div>
-          <div className="cms-stat">
-            <AnimatedCounter value={stats.letters} />
-            <span>{t.cms.home.statLetters}</span>
-          </div>
-          <div className="cms-stat">
-            <AnimatedCounter value={stats.grammar_topics} />
-            <span>{t.cms.home.statGrammar}</span>
-          </div>
-          <div className="cms-stat">
-            <AnimatedCounter value={stats.ai_lessons} />
-            <span>{t.cms.home.statAi}</span>
-          </div>
-        </section>
+        {stats ? (
+          <section className="cms-section cms-stats-row">
+            {stats.learners != null ? (
+              <div className="cms-stat">
+                <AnimatedCounter value={stats.learners} />
+                <span>{t.cms.home.statLearners}</span>
+              </div>
+            ) : null}
+            <div className="cms-stat">
+              <AnimatedCounter value={stats.letters} />
+              <span>{t.cms.home.statLetters}</span>
+            </div>
+            <div className="cms-stat">
+              <AnimatedCounter value={stats.grammar_topics} />
+              <span>{t.cms.home.statGrammar}</span>
+            </div>
+            <div className="cms-stat">
+              <AnimatedCounter value={stats.ai_lessons} />
+              <span>{t.cms.home.statAi}</span>
+            </div>
+          </section>
+        ) : null}
 
         <section className="cms-section">
           <h2>{t.cms.home.featuresTitle}</h2>

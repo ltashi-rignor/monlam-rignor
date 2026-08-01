@@ -292,8 +292,12 @@ async def tutor_chat(
 @router.post("/tts", response_model=TTSOut)
 async def tutor_tts(
     body: TTSIn,
+    request: Request,
     _user_id: UUID = Depends(get_current_user_id),
 ):
+    from app.core.rate_limit import rate_limit_voice
+
+    rate_limit_voice(request, str(_user_id))
     settings = get_settings()
     if not settings.monlam_api_key or settings.monlam_api_key.startswith("YOUR_"):
         raise HTTPException(status_code=503, detail="TTS is not configured")
@@ -330,11 +334,15 @@ async def tutor_tts(
 
 @router.post("/stt", response_model=STTOut)
 async def tutor_stt(
+    request: Request,
     file: UploadFile = File(...),
     language: str = Form("bo"),
     task: str = Form("transcribe"),
     _user_id: UUID = Depends(get_current_user_id),
 ):
+    from app.core.rate_limit import rate_limit_voice
+
+    rate_limit_voice(request, str(_user_id))
     settings = get_settings()
     if not settings.monlam_api_key or settings.monlam_api_key.startswith("YOUR_"):
         raise HTTPException(status_code=503, detail="STT is not configured")

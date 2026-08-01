@@ -177,7 +177,6 @@ def create_app() -> FastAPI:
                 "status": "not_ready",
                 "app": settings.app_name,
                 "checks": checks,
-                "jwt_weak": settings.jwt_is_weak,
             }
 
         from app.services.llm import melong_is_rate_limited
@@ -194,13 +193,7 @@ def create_app() -> FastAPI:
             "status": "ready",
             "app": settings.app_name,
             "checks": checks,
-            "jwt_weak": settings.jwt_is_weak,
-            "env": settings.app_env,
-            "llm": {
-                "provider": "melong",
-                "model": settings.monlam_model,
-                "chat_url": settings.monlam_chat_url,
-            },
+            "env": settings.app_env if not settings.is_production else "production",
         }
 
     @app.get("/api/protected-ping")

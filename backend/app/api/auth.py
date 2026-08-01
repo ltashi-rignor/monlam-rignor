@@ -5,10 +5,15 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth_cookies import (
+    REFRESH_COOKIE,
+    clear_auth_cookies,
+    set_auth_cookies,
+)
 from app.core.config import get_settings
 from app.core.learner_profile import (
     merge_learner_profile,
@@ -69,15 +74,33 @@ async def _issue_session_tokens(db: AsyncSession, user: User) -> TokenResponse:
     )
 
 
+def _attach_session_cookies(response: Response, tokens: TokenResponse) -> TokenResponse:
+    set_auth_cookies(
+        response,
+        access_token=tokens.access_token,
+        refresh_token=tokens.refresh_token,
+    )
+    return tokens
+
+
+def _refresh_token_from(request: Request, body: RefreshBody | None) -> str:
+    raw = (body.refresh_token if body else None) or request.cookies.get(REFRESH_COOKIE) or ""
+    raw = raw.strip()
+    if len(raw) < 20:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+        )
+    return raw
+
+
 def _otp_matches(email: str, code: str, stored: str | None) -> bool:
     if not stored:
         return False
-    # New rows store HMAC hex (64 chars). Legacy plaintext rows still accepted briefly.
+    # Only accept HMAC digests (64 hex chars). Legacy plaintext OTPs are rejected.
     if len(stored) == 64 and all(c in "0123456789abcdef" for c in stored.lower()):
         return verify_otp_hash(email, code, stored)
-    import secrets
-
-    return secrets.compare_digest(stored, code.strip())
+    return False
 
 
 @router.post("/request-otp")
@@ -96,6 +119,15 @@ async def request_otp(
     # Anti-enumeration: always return the same shape.
     if user and user.password_hash:
         return {**GENERIC_OTP_SENT, "email": email}
+
+    # Invalidate any prior unused codes for this email.
+    prior = (
+        await db.scalars(
+            select(EmailOTP).where(EmailOTP.email == email, EmailOTP.used.is_(False))
+        )
+    ).all()
+    for row in prior:
+        row.used = True
 
     code = generate_otp()
     otp = EmailOTP(
@@ -183,6 +215,7 @@ async def verify_email(
 async def register(
     body: RegisterBody,
     request: Request,
+    response: Response,
     db: AsyncSession = Depends(get_db),
 ):
     """Create username + password after email verification."""
@@ -228,23 +261,29 @@ async def register(
     await db.flush()
 
     tokens = await _issue_session_tokens(db, user)
-    return TokenResponse(
+    out = TokenResponse(
         access_token=tokens.access_token,
         refresh_token=tokens.refresh_token,
         is_new_user=True,
         profile_complete=bool(user.profile_complete),
     )
+    return _attach_session_cookies(response, out)
 
 
 @router.post("/login", response_model=TokenResponse)
 async def login(
     body: LoginBody,
     request: Request,
+    response: Response,
     db: AsyncSession = Depends(get_db),
 ):
     """Log in with username or email + password."""
-    rate_limit_auth(request, action="login")
     identifier = body.identifier.strip()
+    rate_limit_auth(
+        request,
+        action="login",
+        email=identifier.lower() if identifier else None,
+    )
     if not identifier:
         raise HTTPException(status_code=400, detail="Email or username required")
 
@@ -270,22 +309,25 @@ async def login(
         )
 
     tokens = await _issue_session_tokens(db, user)
-    return TokenResponse(
+    out = TokenResponse(
         access_token=tokens.access_token,
         refresh_token=tokens.refresh_token,
         is_new_user=False,
         profile_complete=bool(user.profile_complete),
     )
+    return _attach_session_cookies(response, out)
 
 
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh_session(
-    body: RefreshBody,
     request: Request,
+    response: Response,
+    body: RefreshBody = Body(default_factory=RefreshBody),
     db: AsyncSession = Depends(get_db),
 ):
     rate_limit_auth(request, action="refresh")
-    digest = hash_refresh_token(body.refresh_token.strip())
+    raw = _refresh_token_from(request, body)
+    digest = hash_refresh_token(raw)
     result = await db.execute(
         select(RefreshToken)
         .where(RefreshToken.token_hash == digest)
@@ -299,31 +341,41 @@ async def refresh_session(
         or (row.expires_at.replace(tzinfo=timezone.utc) if row.expires_at.tzinfo is None else row.expires_at)
         < now
     ):
+        clear_auth_cookies(response)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired refresh token",
         )
     user = await db.get(User, row.user_id)
     if not user:
+        clear_auth_cookies(response)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
 
     # Rotate: revoke old, mint new pair
     row.revoked = True
     tokens = await _issue_session_tokens(db, user)
-    return tokens
+    return _attach_session_cookies(response, tokens)
 
 
 @router.post("/logout")
 async def logout(
-    body: RefreshBody,
+    request: Request,
+    response: Response,
+    body: RefreshBody = Body(default_factory=RefreshBody),
     db: AsyncSession = Depends(get_db),
 ):
-    """Revoke the provided refresh token."""
-    digest = hash_refresh_token(body.refresh_token.strip())
+    """Revoke the refresh token (body or cookie) and clear session cookies."""
+    try:
+        raw = _refresh_token_from(request, body)
+    except HTTPException:
+        clear_auth_cookies(response)
+        return {"ok": True}
+    digest = hash_refresh_token(raw)
     result = await db.execute(select(RefreshToken).where(RefreshToken.token_hash == digest))
     row = result.scalar_one_or_none()
     if row:
         row.revoked = True
+    clear_auth_cookies(response)
     return {"ok": True}
 
 

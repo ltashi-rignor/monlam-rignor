@@ -52,10 +52,40 @@ class ContactOut(BaseModel):
 
 
 class StatsOut(BaseModel):
-    learners: int
+    """Public marketing counters. Prefer curriculum facts over vanity fiction."""
+
+    learners: int | None = None
     letters: int
     grammar_topics: int
     ai_lessons: int
+    source: str = "curriculum"
+
+
+@router.get("/stats", response_model=StatsOut)
+async def marketing_stats(db: AsyncSession = Depends(get_db)):
+    # Curriculum sizes are fixed product facts (not invented engagement).
+    letters = 30
+    grammar_topics = 48
+    ai_lessons = 12
+
+    # Bucket verified-user count to avoid exact enumeration; hide when tiny.
+    n = int(
+        await db.scalar(
+            select(func.count()).select_from(User).where(User.email_verified.is_(True))
+        )
+        or 0
+    )
+    learners = None
+    if n >= 10:
+        learners = (n // 10) * 10
+
+    return StatsOut(
+        learners=learners,
+        letters=letters,
+        grammar_topics=grammar_topics,
+        ai_lessons=ai_lessons,
+        source="curriculum",
+    )
 
 
 def _serialize(post: CmsPost, *, include_body: bool = True) -> PostOut:
@@ -128,17 +158,6 @@ async def list_announcements(
         .limit(limit)
     )
     return [_serialize(p, include_body=True) for p in result.scalars().all()]
-
-
-@router.get("/stats", response_model=StatsOut)
-async def marketing_stats(db: AsyncSession = Depends(get_db)):
-    # Do not expose exact registered user counts publicly.
-    return StatsOut(
-        learners=128,
-        letters=30,
-        grammar_topics=48,
-        ai_lessons=12,
-    )
 
 
 @router.post("/contact", response_model=ContactOut)

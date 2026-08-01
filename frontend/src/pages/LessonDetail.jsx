@@ -4,6 +4,7 @@ import { api, clearApiCache } from '../api/client'
 import { useModuleProgress } from '../hooks/useModuleProgress'
 import { useTibetanVoice } from '../hooks/useTibetanVoice'
 import VoicePicker from '../components/VoicePicker'
+import OfflineBanner from '../components/OfflineBanner'
 import WorkingProgress from '../components/WorkingProgress'
 import { playFanfare, playLose, playWin, unlockAudio } from '../lib/gameSfx'
 import { useI18n } from '../i18n/useI18n'
@@ -352,7 +353,10 @@ export default function LessonDetail() {
           </p>
           <h1>{title}</h1>
           {focus && <p className="muted">{focus}</p>}
-          {lesson.offline && <p className="muted">{t.modules.offlineLesson}</p>}
+          <OfflineBanner
+            offline={lesson.offline}
+            message={t.modules.offlineLesson}
+          />
         </div>
       </header>
 

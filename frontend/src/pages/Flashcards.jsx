@@ -296,9 +296,11 @@ export default function Flashcards() {
                       <div className="flash-english" dir="ltr">
                         {ritualWord.english}
                       </div>
-                      <div className="flash-wylie" dir="ltr">
-                        {ritualWord.wylie}
-                      </div>
+                      {ritualWord.wylie ? (
+                        <div className="flash-wylie" dir="ltr">
+                          {ritualWord.wylie}
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 </div>

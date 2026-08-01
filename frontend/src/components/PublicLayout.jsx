@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
+import BrandLogo from './BrandLogo'
 import ErrorBoundary from './ErrorBoundary'
 import { useI18n } from '../i18n/useI18n'
 import { requireAuth } from '../lib/requireAuth'
@@ -86,8 +87,7 @@ export default function PublicLayout() {
       <header className="cms-header">
         <div className="cms-wrap cms-header-inner">
           <Link to="/" className="cms-brand" onClick={closeMenu}>
-            <span className="cms-brand-mark">རིག་ནོར།</span>
-            <span className="cms-brand-sub">Rignor</span>
+            <BrandLogo size="sm" />
           </Link>
 
           <nav className="cms-nav cms-nav-desktop" aria-label="Primary">
@@ -171,9 +171,9 @@ export default function PublicLayout() {
         inert={isCompact && !menuOpen ? true : undefined}
       >
         <div className="cms-drawer-head">
-          <p id={titleId} className="cms-brand-mark">
-            རིག་ནོར།
-          </p>
+          <div id={titleId} className="cms-drawer-brand">
+            <BrandLogo size="sm" />
+          </div>
           <button type="button" className="cms-drawer-close" aria-label={t.cms.nav.closeMenu} onClick={closeMenu}>
             ×
           </button>
@@ -231,7 +231,7 @@ export default function PublicLayout() {
       <footer className="cms-footer">
         <div className="cms-wrap cms-footer-inner">
           <div className="cms-footer-brand">
-            <p className="cms-brand-mark">རིག་ནོར།</p>
+            <BrandLogo size="sm" />
             <p className="muted">{t.cms.footer.tag}</p>
           </div>
           <div className="cms-footer-links">

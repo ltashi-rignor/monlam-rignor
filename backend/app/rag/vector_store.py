@@ -83,8 +83,10 @@ class VectorStore:
         return [dict(r) for r in rows]
 
     async def count(self, session: AsyncSession) -> int:
-        result = await session.execute(select(KnowledgeChunk.id))
-        return len(result.all())
+        from sqlalchemy import func
+
+        result = await session.scalar(select(func.count()).select_from(KnowledgeChunk))
+        return int(result or 0)
 
 
 _store: VectorStore | None = None

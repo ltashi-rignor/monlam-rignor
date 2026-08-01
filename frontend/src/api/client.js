@@ -5,31 +5,75 @@ const inflight = new Map()
 /** Short-lived GET cache for snappy page switches. */
 const cache = new Map()
 const DEFAULT_TTL_MS = 15_000
+const SESSION_FLAG = 'mr_session'
 
 let refreshInflight = null
+/** Memory-only access token (optional). Prefer httpOnly cookies; never persist JWTs. */
+let memoryAccessToken = null
 
-function getToken() {
-  return localStorage.getItem('mr_token')
-}
-
-function getRefreshToken() {
-  return localStorage.getItem('mr_refresh')
+function scrubLegacyTokenStorage() {
+  try {
+    localStorage.removeItem('mr_token')
+    localStorage.removeItem('mr_refresh')
+  } catch {
+    /* ignore */
+  }
 }
 
 export function setToken(token) {
-  if (token) localStorage.setItem('mr_token', token)
-  else localStorage.removeItem('mr_token')
+  memoryAccessToken = token || null
+  scrubLegacyTokenStorage()
+  if (!token) {
+    try {
+      sessionStorage.removeItem(SESSION_FLAG)
+    } catch {
+      /* ignore */
+    }
+  }
   clearApiCache()
 }
 
-export function setRefreshToken(token) {
-  if (token) localStorage.setItem('mr_refresh', token)
-  else localStorage.removeItem('mr_refresh')
+export function setRefreshToken(_token) {
+  // Refresh lives in httpOnly cookie only.
+  scrubLegacyTokenStorage()
 }
 
-export function setSessionTokens({ access_token, refresh_token }) {
-  setToken(access_token || null)
-  if (refresh_token !== undefined) setRefreshToken(refresh_token || null)
+export function setSessionTokens({ access_token } = {}) {
+  // Prefer httpOnly cookies. Keep a memory JWT only when the API returns a real token
+  // (still never written to localStorage).
+  memoryAccessToken =
+    typeof access_token === 'string' && access_token.includes('.') ? access_token : null
+  scrubLegacyTokenStorage()
+  try {
+    if (access_token) sessionStorage.setItem(SESSION_FLAG, '1')
+    else sessionStorage.removeItem(SESSION_FLAG)
+  } catch {
+    /* ignore */
+  }
+  clearApiCache()
+}
+
+export function markSessionActive() {
+  scrubLegacyTokenStorage()
+  try {
+    sessionStorage.setItem(SESSION_FLAG, '1')
+  } catch {
+    /* ignore */
+  }
+}
+
+export function hasSessionHint() {
+  try {
+    if (sessionStorage.getItem(SESSION_FLAG)) return true
+  } catch {
+    /* ignore */
+  }
+  // Migrate: old localStorage sessions still bootstrap once, then scrub.
+  try {
+    return Boolean(localStorage.getItem('mr_token') || localStorage.getItem('mr_refresh'))
+  } catch {
+    return false
+  }
 }
 
 export function clearApiCache(prefix) {
@@ -63,8 +107,7 @@ function isPublicPath(pathname) {
 }
 
 function clearSessionAndRedirect() {
-  setToken(null)
-  setRefreshToken(null)
+  setSessionTokens({ access_token: null })
   window.dispatchEvent(new CustomEvent('mr:unauthorized'))
   const path = window.location.pathname || ''
   if (isPublicPath(path)) return
@@ -73,23 +116,19 @@ function clearSessionAndRedirect() {
 }
 
 async function tryRefreshAccessToken() {
-  const refresh = getRefreshToken()
-  if (!refresh) return null
   if (!refreshInflight) {
     refreshInflight = (async () => {
       try {
         const res = await fetch(`${API_URL}/api/auth/refresh`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refresh_token: refresh }),
+          credentials: 'include',
+          body: JSON.stringify({}),
         })
         const data = await res.json().catch(() => ({}))
         if (!res.ok) return null
-        setSessionTokens({
-          access_token: data.access_token,
-          refresh_token: data.refresh_token,
-        })
-        return data.access_token
+        setSessionTokens({ access_token: data.access_token })
+        return data.access_token || true
       } catch {
         return null
       } finally {
@@ -113,8 +152,7 @@ async function request(path, options = {}) {
     ...(isForm ? {} : { 'Content-Type': 'application/json' }),
     ...(options.headers || {}),
   }
-  const token = getToken()
-  if (token) headers.Authorization = `Bearer ${token}`
+  if (memoryAccessToken) headers.Authorization = `Bearer ${memoryAccessToken}`
 
   const ttl = options.ttl
   const useCache = method === 'GET' && ttl !== 0
@@ -134,24 +172,24 @@ async function request(path, options = {}) {
       ...options,
       method,
       headers,
+      credentials: 'include',
       body: buildBody(options),
     })
 
     if (res.status === 401 && !path.startsWith('/api/auth/')) {
       const next = await tryRefreshAccessToken()
       if (next) {
-        headers.Authorization = `Bearer ${next}`
+        if (typeof next === 'string') headers.Authorization = `Bearer ${next}`
         res = await fetch(`${API_URL}${path}`, {
           ...options,
           method,
           headers,
+          credentials: 'include',
           body: buildBody(options),
         })
       } else {
         clearSessionAndRedirect()
       }
-    } else if (res.status === 401) {
-      clearSessionAndRedirect()
     }
 
     const data = await res.json().catch(() => ({}))
@@ -207,9 +245,15 @@ export const api = {
   login: (identifier, password) =>
     request('/api/auth/login', { method: 'POST', body: { identifier, password } }),
   refresh: (refresh_token) =>
-    request('/api/auth/refresh', { method: 'POST', body: { refresh_token } }),
+    request('/api/auth/refresh', {
+      method: 'POST',
+      body: refresh_token ? { refresh_token } : {},
+    }),
   logout: (refresh_token) =>
-    request('/api/auth/logout', { method: 'POST', body: { refresh_token } }),
+    request('/api/auth/logout', {
+      method: 'POST',
+      body: refresh_token ? { refresh_token } : {},
+    }),
   me: () => request('/api/auth/me', { ttl: 60_000 }),
   updateProfile: (body) => request('/api/auth/me', { method: 'PUT', body }),
   getRoadmap: () => request('/api/planner/roadmap', { ttl: 0 }),
@@ -267,22 +311,31 @@ export const api = {
   tutorTts: (text, voice_name = 'lhasa_female') =>
     request('/api/tutor/tts', { method: 'POST', body: { text, voice_name }, ttl: 0 }),
   tutorStt: async (blob, filename = 'speech.webm') => {
-    const token = getToken()
     const form = new FormData()
     form.append('file', blob, filename)
     form.append('language', 'bo')
     form.append('task', 'transcribe')
+    const headers = {}
+    if (memoryAccessToken) headers.Authorization = `Bearer ${memoryAccessToken}`
     let res = await fetch(`${API_URL}/api/tutor/stt`, {
       method: 'POST',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      headers,
+      credentials: 'include',
       body: form,
     })
     if (res.status === 401) {
       const next = await tryRefreshAccessToken()
       if (next) {
+        const retryHeaders = {}
+        if (typeof next === 'string' && next.includes('.')) {
+          retryHeaders.Authorization = `Bearer ${next}`
+        } else if (memoryAccessToken) {
+          retryHeaders.Authorization = `Bearer ${memoryAccessToken}`
+        }
         res = await fetch(`${API_URL}/api/tutor/stt`, {
           method: 'POST',
-          headers: { Authorization: `Bearer ${next}` },
+          headers: retryHeaders,
+          credentials: 'include',
           body: form,
         })
       } else {

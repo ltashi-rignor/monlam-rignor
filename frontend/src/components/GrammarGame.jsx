@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useI18n } from '../i18n/useI18n'
 import { tibetanOrFallback } from '../i18n/labels'
 import { playFanfare, playLose, playWin, unlockAudio } from '../lib/gameSfx'
+import OfflineBanner from './OfflineBanner'
 import WorkingProgress from './WorkingProgress'
 
 const TOPICS = [
@@ -285,13 +286,15 @@ export default function GrammarGame({
             <strong dir="ltr">{bestStreak}</strong>
           </div>
         </div>
-        {session?.offline && (
-          <p className="gq-offline">
-            {session.source === 'rag' || session.source === 'rag-bank'
+        <OfflineBanner
+          offline={session?.offline}
+          source={session?.source}
+          message={
+            session?.source === 'rag' || session?.source === 'rag-bank'
               ? t.grammar.fromHandbook
-              : t.grammar.offlineNote}
-          </p>
-        )}
+              : t.grammar.offlineNote
+          }
+        />
         {!!sources.length && (
           <section className="gq-sources">
             <h4>{t.grammar.sources}</h4>

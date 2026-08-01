@@ -36,7 +36,9 @@ class TokenResponse(BaseModel):
 
 
 class RefreshBody(BaseModel):
-    refresh_token: str = Field(min_length=20, max_length=512)
+    """Optional when the refresh token is already in an httpOnly cookie."""
+
+    refresh_token: str | None = Field(default=None, min_length=20, max_length=512)
 
 
 class SetupTokenResponse(BaseModel):

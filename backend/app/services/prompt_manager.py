@@ -135,10 +135,27 @@ def grammar_user(
         if profile
         else ""
     )
-    # V1: ignore handbook excerpts for judging — simple rules only.
-    _ = retrieved
+    handbook = ""
+    if retrieved:
+        parts: list[str] = []
+        for i, row in enumerate(retrieved[:4], start=1):
+            title = str(row.get("title") or row.get("source_name") or "handbook").strip()
+            page = row.get("page_number")
+            page_bit = f" p.{page}" if page is not None else ""
+            content = str(row.get("content") or "").strip()[:600]
+            if content:
+                parts.append(f"[{i}] {title}{page_bit}\n{content}")
+        if parts:
+            handbook = (
+                "\nOptional Classical Tibetan Grammar Handbook excerpts "
+                "(use only if they clarify a simple V1 case/copula issue; "
+                "do not invent complex errors from them):\n"
+                + "\n\n".join(parts)
+                + "\n"
+            )
     return (
         f"{profile_block}"
+        f"{handbook}"
         "Student Tibetan text to check (V1 simple mode):\n"
         f"{wrap_untrusted('STUDENT_TEXT', text)}\n"
         "Apply the MASTER ERROR KEY from the system prompt. Find EVERY obvious simple error.\n"
@@ -254,26 +271,36 @@ def practice_system() -> str:
         "Bias exercise types toward learning_styles and weak grammar_confidence areas; "
         "theme prompts around interests when useful; respect preferred difficulty. "
         f"{LANG_RULE} "
+        "Each exercise MUST be a real graded drill with one clear correct answer. "
+        "Never invent vague ‘order these unrelated sentences’ tasks. "
         "Rules for each exercise: "
-        "prompt = Tibetan. "
-        "options = Tibetan strings when present (4 options for choice types). "
-        "answer = correct Tibetan form for scoring (must match one option when options exist). "
-        "explanation = short Tibetan explanation. "
+        "prompt = Tibetan instruction + the item to solve (one sentence focus). "
+        "options = exactly 4 DISTINCT plain Tibetan strings for choice types "
+        "(never objects; never near-duplicates that only differ by ། or ་). "
+        "answer = exact match of ONE option string when options exist. "
+        "explanation = short Tibetan why. "
         "title and focus_areas[] in Tibetan. "
         "Output JSON: title, focus_areas[], "
-        "exercises[{id, type, prompt, options?, answer, explanation}]. "
-        "Types (mix several): fill_blank, correct_sentence, honorific_choice, "
-        "translate, match_word, free_write, particle_pick, reorder_phrase. "
-        "FILL_BLANK / PARTICLE_PICK critical rule: "
-        "Use blank marker ______ (6 underscores) for the missing word ONLY. "
-        "The prompt must NOT include the answer (or any option) after/before the blank. "
-        "BAD: ང་ལ་དཔེ་ཆ་མང་པོ་______འདུག  "
-        "GOOD: ང་ལ་དཔེ་ཆ་མང་པོ་______།  "
-        "The blank replaces the full missing word (ཡོད/འདུག/ཡིན/རེད/particle). "
-        "Generate exactly 8–10 short kid/teen-friendly exercises. "
-        "At least 5 must include options (multiple choice). "
-        "At most 2 free_write. options must be plain strings (not objects). "
-        "id = short string like e1, e2, …"
+        "exercises[{id, type, prompt, options?, tokens?, answer, explanation}]. "
+        "Allowed types ONLY: fill_blank, particle_pick, honorific_choice, "
+        "correct_sentence, match_word, reorder_phrase, free_write. "
+        "Do NOT use translate for beginners unless profile ability is high. "
+        "TYPE CONTRACTS: "
+        "1) fill_blank / particle_pick: ONE sentence with ______ blank for the missing "
+        "particle/copula/word. options = 4 short Tibetan choices (e.g. ལ / གིས / ནས / དང་). "
+        "prompt must NOT leak the answer before/after the blank. "
+        "BAD: ང་ལ་དཔེ་ཆ་མང་པོ་______འདུག   GOOD: ང་ལ་དཔེ་ཆ་མང་པོ་______། "
+        "2) honorific_choice: ordinary vs honorific form — 4 options, one correct. "
+        "3) correct_sentence: show a wrong sentence in prompt; options = 4 full sentences, "
+        "one corrected. "
+        "4) match_word: prompt gives English OR meaning cue in Tibetan; options = 4 Tibetan words. "
+        "5) reorder_phrase (at most ONE per set): scramble chunks of ONE short sentence. "
+        "Include tokens[] = 3–5 Tibetan chunks in scrambled order. "
+        "options[] = 4 full candidate sentences (complete Tibetan), exactly one correct order. "
+        "NEVER number multi-sentence lists (no '1. … 2. …') and NEVER options like '1, 2, 3, 4'. "
+        "GOOD tokens: [\"སློབ་གྲྭ་ལ\", \"ང\", \"འགྲོ།\"] options include \"ང་སློབ་གྲྭ་ལ་འགྲོ།\". "
+        "6) free_write: at most 1; prompt asks for one short Tibetan sentence; answer = model sentence. "
+        "Generate exactly 8 exercises. At least 6 with options. ids e1…e8."
     )
 
 
@@ -290,14 +317,16 @@ def practice_user(
     )
     return (
         f"{profile_block}"
-        "Create today's Tibetan practice set (8–10 interactive drills).\n"
+        "Create today's Tibetan practice set — exactly 8 interactive drills.\n"
         f"Recent mistakes:\n{mistakes}\n\n"
         f"Progress snapshot:\n{progress}\n\n"
         f"Optional focus: {focus or 'adaptive from mistakes and profile'}\n"
-        "Vary types. Prefer multiple-choice for speed. "
-        "For fill_blank/particle_pick: prompt ends at ______ or ______། — "
-        "never leave ཡོད/འདུག/ཡིན/རེད or an option glued after the blank. "
-        "All learner-facing text in Tibetan script. options as plain strings. JSON only."
+        "Assign each drill a clear skill (particle, case, copula, vocab, honorific). "
+        "Prefer fill_blank + particle_pick + correct_sentence. "
+        "At most one reorder_phrase (single sentence chunks + 4 full-sentence options). "
+        "Reject bad patterns: numbered paragraph ordering; options '1, 2, 3, 4'; "
+        "answer not in options; duplicate options. "
+        "All learner-facing text in Tibetan script. JSON only."
     )
 
 

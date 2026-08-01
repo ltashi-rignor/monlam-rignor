@@ -206,11 +206,30 @@ export default function Practice() {
   function setAnswer(key, value) {
     if (session?.completed) return
     setAnswers((a) => ({ ...a, [key]: value }))
+    setError('')
+  }
+
+  function pickOption(key, value) {
+    setAnswer(key, value)
+    // Advance after a choice so kids aren't stranded on a question.
+    if (step < exercises.length - 1) {
+      window.setTimeout(() => setStep((s) => Math.min(s + 1, exercises.length - 1)), 180)
+    }
+  }
+
+  function firstUnansweredIndex() {
+    for (let i = 0; i < exercises.length; i += 1) {
+      const key = exerciseKey(exercises[i], i)
+      if (!String(answers[key] || '').trim()) return i
+    }
+    return -1
   }
 
   async function submit() {
     if (!session || session.completed) return
-    if (answeredCount < exercises.length) {
+    const missing = firstUnansweredIndex()
+    if (missing >= 0) {
+      setStep(missing)
       setError(t.practice.answerAll)
       return
     }
@@ -419,6 +438,16 @@ export default function Practice() {
                   </div>
                   <p className="practice-prompt tibetan">{current.prompt}</p>
 
+                  {Array.isArray(current.tokens) && current.tokens.length > 0 ? (
+                    <div className="practice-tokens" aria-label="scrambled">
+                      {current.tokens.map((tok, ti) => (
+                        <span key={`${currentKey}-tok-${ti}`} className="practice-token tibetan">
+                          {tok}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+
                   {options.length > 0 ? (
                     <div className="practice-options" role="listbox">
                       {options.map((opt, oi) => {
@@ -432,7 +461,7 @@ export default function Practice() {
                             aria-selected={on}
                             className={`practice-option ${on ? 'is-on' : ''}`}
                             disabled={session.completed || busy}
-                            onClick={() => setAnswer(currentKey, val)}
+                            onClick={() => pickOption(currentKey, val)}
                           >
                             <span className="practice-option-mark" aria-hidden>
                               {['ཀ', 'ཁ', 'ག', 'ང', 'ཅ', 'ཆ'][oi] || oi + 1}
@@ -473,6 +502,8 @@ export default function Practice() {
                     </div>
                   )}
 
+                  {error ? <p className="error practice-card-error">{error}</p> : null}
+
                   <div className="practice-nav">
                     <button
                       type="button"
@@ -494,11 +525,13 @@ export default function Practice() {
                     ) : !session.completed ? (
                       <button
                         type="button"
-                        className="btn btn-accent"
+                        className="btn btn-primary practice-finish-btn"
                         onClick={submit}
-                        disabled={busy}
+                        disabled={busy || !String(answers[currentKey] || '').trim()}
                       >
-                        {busyKind === 'submit' ? t.practice.submitting : t.practice.submit}
+                        {busyKind === 'submit'
+                          ? t.practice.submitting
+                          : t.practice.finish || t.practice.submit}
                       </button>
                     ) : (
                       <div className="practice-done-actions">
@@ -513,6 +546,11 @@ export default function Practice() {
                       </div>
                     )}
                   </div>
+                  {step >= exercises.length - 1 &&
+                  !session.completed &&
+                  !String(answers[currentKey] || '').trim() ? (
+                    <p className="muted practice-pick-hint">{t.practice.pickThenFinish}</p>
+                  ) : null}
                 </div>
               )}
             </div>

@@ -58,6 +58,8 @@ class Settings(BaseSettings):
 
     # local | production
     app_env: str = "local"
+    # Honor X-Forwarded-For / X-Real-IP only behind a trusted reverse proxy.
+    trust_proxy_headers: bool = False
     # Disable OpenAPI docs outside local unless explicitly enabled.
     enable_docs: bool | None = None
 

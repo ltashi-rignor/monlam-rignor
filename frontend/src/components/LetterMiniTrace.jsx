@@ -2,13 +2,9 @@
  * Compact one-letter trace pad for the Alphabet letter ritual.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import traceDoc from '../data/tibetanTraceLetters.json'
-import { normalizeDoc, normalizeBrush, TraceEngine } from '../lib/traceCore'
+import { TraceEngine } from '../lib/traceCore'
+import { loadTraceData } from '../lib/loadTraceData'
 import { useI18n } from '../i18n/useI18n'
-
-const TRACE_LETTERS = normalizeDoc(traceDoc)
-const TRACE_BRUSH = normalizeBrush(traceDoc.brush)
-const BY_GLYPH = Object.fromEntries(TRACE_LETTERS.map((L) => [L.glyph, L]))
 
 export default function LetterMiniTrace({ glyph, onComplete }) {
   const { t } = useI18n()
@@ -21,18 +17,34 @@ export default function LetterMiniTrace({ glyph, onComplete }) {
   const [finished, setFinished] = useState(false)
   const [strokeI, setStrokeI] = useState(0)
   const [strokeN, setStrokeN] = useState(1)
-
-  const traceLetter = BY_GLYPH[glyph] || TRACE_LETTERS[0]
+  const [traceLetter, setTraceLetter] = useState(null)
+  const [brush, setBrush] = useState(null)
+  const [loadError, setLoadError] = useState(false)
 
   useEffect(() => {
     onCompleteRef.current = onComplete
   }, [onComplete])
 
+  useEffect(() => {
+    let cancelled = false
+    loadTraceData()
+      .then((data) => {
+        if (cancelled) return
+        setBrush(data.brush)
+        setTraceLetter(data.byGlyph[glyph] || data.letters[0] || null)
+      })
+      .catch(() => {
+        if (!cancelled) setLoadError(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [glyph])
+
   const fit = useCallback(() => {
     const engine = engineRef.current
     const wrap = wrapRef.current
     if (!engine || !wrap) return
-    // Size buffer from the square content box (padding already inset)
     const rect = wrap.getBoundingClientRect()
     const style = getComputedStyle(wrap)
     const padX = (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0)
@@ -46,7 +58,7 @@ export default function LetterMiniTrace({ glyph, onComplete }) {
 
   useEffect(() => {
     const canvas = canvasRef.current
-    if (!canvas) return undefined
+    if (!canvas || !brush) return undefined
     doneRef.current = false
     const engine = new TraceEngine(canvas, {
       sfx: false,
@@ -73,7 +85,7 @@ export default function LetterMiniTrace({ glyph, onComplete }) {
         }
       },
     })
-    engine.setBrush(TRACE_BRUSH)
+    engine.setBrush(brush)
     engineRef.current = engine
     fit()
     const onResize = () => fit()
@@ -86,7 +98,7 @@ export default function LetterMiniTrace({ glyph, onComplete }) {
       engine.destroy()
       engineRef.current = null
     }
-  }, [fit])
+  }, [fit, brush])
 
   useEffect(() => {
     const engine = engineRef.current
@@ -99,8 +111,11 @@ export default function LetterMiniTrace({ glyph, onComplete }) {
     fit()
   }, [glyph, traceLetter, fit])
 
-  if (!traceLetter) {
+  if (loadError) {
     return <p className="muted">{t.modules.alphaNoTrace}</p>
+  }
+  if (!traceLetter || !brush) {
+    return <p className="muted">…</p>
   }
 
   return (
