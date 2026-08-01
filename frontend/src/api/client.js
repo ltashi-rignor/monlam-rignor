@@ -151,10 +151,10 @@ export const api = {
     request('/api/tutor/chat', { method: 'POST', body: { messages } }),
   tutorTts: (text, voice_name = 'lhasa_female') =>
     request('/api/tutor/tts', { method: 'POST', body: { text, voice_name }, ttl: 0 }),
-  generateVocabRain: (theme = 'animals', count = 14, difficulty = 'easy') =>
+  generateVocabRain: (theme = 'animals', count = 28, difficulty = 'easy', exclude = []) =>
     request('/api/games/vocab-rain', {
       method: 'POST',
-      body: { theme, count, difficulty },
+      body: { theme, count, difficulty, exclude },
       ttl: 0,
     }),
 }

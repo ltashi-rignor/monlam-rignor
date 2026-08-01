@@ -10,13 +10,13 @@ import VoicePicker from '../components/VoicePicker'
 import { bo } from '../i18n/bo'
 
 const THEMES = [
-  { id: 'all', labelKey: 'partyThemeAll' },
-  { id: 'animals', labelKey: 'partyThemeAnimals' },
-  { id: 'family', labelKey: 'partyThemeFamily' },
-  { id: 'nature', labelKey: 'partyThemeNature' },
-  { id: 'food', labelKey: 'partyThemeFood' },
-  { id: 'greetings', labelKey: 'partyThemeGreetings' },
-  { id: 'numbers', labelKey: 'partyThemeNumbers' },
+  { id: 'all', labelKey: 'partyThemeAll', glyph: 'ཨ' },
+  { id: 'animals', labelKey: 'partyThemeAnimals', glyph: 'ཁྱི' },
+  { id: 'family', labelKey: 'partyThemeFamily', glyph: 'ཨ་མ' },
+  { id: 'nature', labelKey: 'partyThemeNature', glyph: 'ཉི་མ' },
+  { id: 'food', labelKey: 'partyThemeFood', glyph: 'ཇ' },
+  { id: 'greetings', labelKey: 'partyThemeGreetings', glyph: 'བཀྲ་ཤིས' },
+  { id: 'numbers', labelKey: 'partyThemeNumbers', glyph: 'གསུམ' },
 ]
 
 const BALLOON_COLORS = ['#1a6b76', '#c47a16', '#2a9d8f', '#e9c46a', '#f4a261', '#0d3d45']
@@ -24,7 +24,8 @@ const START_SPEED = 7.5
 const SPEED_STEP = 0.55
 const MAX_SPEED = 22
 const FLOOR = 88
-const PACK_SIZE = 14
+const PACK_SIZE = 28
+const REFILL_AT = 6
 
 function normalize(s) {
   return String(s || '')
@@ -47,9 +48,11 @@ function answersFor(word) {
   return [...new Set([...parts, full, wylie].filter(Boolean))]
 }
 
-function pickWord(pool, avoidId) {
+function pickWord(pool, usedIds, avoidId) {
   if (!pool?.length) return null
-  const opts = pool.length < 2 ? pool : pool.filter((w) => w.id !== avoidId)
+  const unused = pool.filter((w) => !usedIds.has(w.id) && w.id !== avoidId)
+  const bag = unused.length ? unused : pool.filter((w) => w.id !== avoidId)
+  const opts = bag.length ? bag : pool
   return opts[Math.floor(Math.random() * opts.length)]
 }
 
@@ -97,6 +100,8 @@ export default function LetterParty() {
   const inputRef = useRef(null)
   const wordRef = useRef(null)
   const poolRef = useRef([])
+  const usedRef = useRef(new Set())
+  const refillBusyRef = useRef(false)
   const themeRef = useRef(theme)
   const speedRef = useRef(START_SPEED)
   const yRef = useRef(0)
@@ -157,13 +162,41 @@ export default function LetterParty() {
     })
   }, [])
 
+  const refillPool = useCallback(async () => {
+    if (refillBusyRef.current || phaseRef.current !== 'play') return
+    const unused = poolRef.current.filter((w) => !usedRef.current.has(w.id)).length
+    if (unused > REFILL_AT) return
+    refillBusyRef.current = true
+    try {
+      const exclude = poolRef.current.map((w) => w.tibetan).slice(-40)
+      const pack = await api.generateVocabRain(themeRef.current, PACK_SIZE, 'easy', exclude)
+      const incoming = Array.isArray(pack.words) ? pack.words : []
+      if (!incoming.length) return
+      const have = new Set(poolRef.current.map((w) => w.tibetan))
+      const merged = [...poolRef.current]
+      for (const w of incoming) {
+        if (have.has(w.tibetan)) continue
+        have.add(w.tibetan)
+        merged.push(w)
+      }
+      poolRef.current = merged
+      setPool(merged)
+      if (pack.source === 'ai') setSource('ai')
+    } catch {
+      /* keep playing with current pool */
+    } finally {
+      refillBusyRef.current = false
+    }
+  }, [])
+
   const spawn = useCallback(
     (avoidId, nextSpeed) => {
-      const w = pickWord(poolRef.current, avoidId)
+      const w = pickWord(poolRef.current, usedRef.current, avoidId)
       if (!w) {
         gameOver()
         return
       }
+      usedRef.current.add(w.id)
       setWord(w)
       wordRef.current = w
       setY(0)
@@ -175,14 +208,16 @@ export default function LetterParty() {
       }
       speak(w.tibetan)
       window.setTimeout(() => inputRef.current?.focus(), 40)
+      refillPool()
     },
-    [speak, gameOver],
+    [speak, gameOver, refillPool],
   )
 
   const beginPlay = useCallback(
     (words, themeId, packSource) => {
       setPool(words)
       poolRef.current = words
+      usedRef.current = new Set()
       setSource(packSource || 'ai')
       setTheme(themeId)
       themeRef.current = themeId
@@ -208,7 +243,7 @@ export default function LetterParty() {
     phaseRef.current = 'loading'
     setPhase('loading')
     try {
-      const pack = await api.generateVocabRain(themeId, PACK_SIZE, 'easy')
+      const pack = await api.generateVocabRain(themeId, PACK_SIZE, 'easy', [])
       const words = Array.isArray(pack.words) ? pack.words : []
       if (!words.length) throw new Error(bo.modules.partyLoadEmpty)
       beginPlay(words, themeId, pack.source || 'ai')
@@ -283,7 +318,12 @@ export default function LetterParty() {
   const hintAnswers = useMemo(() => (word ? answersFor(word) : []), [word])
 
   return (
-    <div className="module-page tibetan party-page rain-page">
+    <div
+      className={
+        'module-page tibetan rain-page' +
+        (phase === 'play' || phase === 'over' ? ' is-arena' : ' is-lobby')
+      }
+    >
       <div className="party-fx" aria-hidden>
         {balloons.map((b) => (
           <span
@@ -317,64 +357,93 @@ export default function LetterParty() {
 
       {cheer && <p className="party-cheer">{cheer}</p>}
 
-      <header className="party-header">
-        <div>
-          <p className="module-eyebrow">{bo.modules.partyEyebrow}</p>
-          <h1>{bo.modules.partyTitle}</h1>
-          <p className="party-sub">{bo.modules.partySub}</p>
-        </div>
-        <VoicePicker value={voice} onChange={setVoice} />
-      </header>
-
       {(phase === 'lobby' || phase === 'loading') && (
-        <section className="party-lobby">
-          <div className="rain-lobby-art" aria-hidden>
-            <span className="rain-lobby-drop">ཆུ</span>
-            <span className="rain-lobby-drop">ཉི་མ</span>
-            <span className="rain-lobby-drop">ཁྱི</span>
-          </div>
-          <p className="party-lobby-lead">{bo.modules.partyPickLevel}</p>
-          <p className="rain-how">{bo.modules.partyAiNote}</p>
-          {loadError && <p className="error">{loadError}</p>}
-          {phase === 'loading' ? (
-            <p className="rain-loading">{bo.modules.partyLoading}</p>
-          ) : (
-            <div className="rain-theme-grid">
-              {THEMES.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  className="party-level-card"
-                  onClick={() => start(t.id)}
-                >
-                  <strong>{bo.modules[t.labelKey]}</strong>
-                  <span>{bo.modules.partyAiPack}</span>
-                </button>
-              ))}
+        <section className="rain-lobby">
+          <div className="rain-lobby-hero">
+            <p className="rain-brand">{bo.brand}</p>
+            <h1 className="rain-title">{bo.modules.partyTitle}</h1>
+            <p className="rain-tagline">{bo.modules.partySub}</p>
+            <div className="rain-lobby-sky" aria-hidden>
+              <span className="rain-drift rain-drift-a">ཆུ</span>
+              <span className="rain-drift rain-drift-b">ཉི་མ</span>
+              <span className="rain-drift rain-drift-c">ཁྱི</span>
             </div>
-          )}
+          </div>
+
+          <div className="rain-lobby-body">
+            <div className="rain-lobby-tools">
+              <p className="rain-pick">{bo.modules.partyPickLevel}</p>
+              <VoicePicker value={voice} onChange={setVoice} />
+            </div>
+            <p className="rain-how">{bo.modules.partyAiNote}</p>
+            {loadError && <p className="error">{loadError}</p>}
+
+            {phase === 'loading' ? (
+              <div className="rain-loading-block">
+                <span className="rain-loading-orb" aria-hidden />
+                <p className="rain-loading">{bo.modules.partyLoading}</p>
+              </div>
+            ) : (
+              <div className="rain-theme-grid">
+                {THEMES.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    className="rain-theme-btn"
+                    onClick={() => start(t.id)}
+                  >
+                    <span className="rain-theme-glyph tibetan">{t.glyph}</span>
+                    <strong>{bo.modules[t.labelKey]}</strong>
+                    <span className="rain-theme-meta">{bo.modules.partyAiPack}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </section>
       )}
 
       {(phase === 'play' || phase === 'over') && (
         <section className={'rain-stage' + (shake ? ' is-shake' : '')}>
-          <div className="party-hud rain-hud">
-            <span>
-              {bo.modules.partyScore} <b dir="ltr">{score}</b>
-            </span>
-            <span>
-              {bo.modules.partyBest} <b dir="ltr">{best}</b>
-            </span>
-            <span className="rain-theme-chip">{themeLabel(theme)}</span>
-            <span className="rain-source-chip" dir="ltr">
-              {source === 'ai' ? bo.modules.partySourceAi : bo.modules.partySourceFallback}
-            </span>
-          </div>
+          <header className="rain-arena-top">
+            <button
+              type="button"
+              className="rain-back"
+              onClick={() => {
+                phaseRef.current = 'lobby'
+                setPhase('lobby')
+              }}
+            >
+              {bo.modules.partyChangeLevel}
+            </button>
+            <div className="rain-scoreboard">
+              <div className="rain-stat">
+                <span>{bo.modules.partyScore}</span>
+                <b dir="ltr">{score}</b>
+              </div>
+              <div className="rain-stat">
+                <span>{bo.modules.partyBest}</span>
+                <b dir="ltr">{best}</b>
+              </div>
+            </div>
+            <div className="rain-arena-meta">
+              <span>{themeLabel(theme)}</span>
+              <span dir="ltr">
+                {source === 'ai' ? bo.modules.partySourceAi : bo.modules.partySourceFallback}
+              </span>
+            </div>
+          </header>
 
           <div className="rain-sky" aria-live="polite">
+            <div className="rain-sky-wash" aria-hidden />
+            <div className="rain-cloud rain-cloud-1" aria-hidden />
+            <div className="rain-cloud rain-cloud-2" aria-hidden />
+            <div className="rain-ridge" aria-hidden />
             <div className="rain-floor-line" aria-hidden />
+
             {word && phase === 'play' && (
               <button
+                key={word.id}
                 type="button"
                 className="rain-falling tibetan"
                 style={{ top: `${y}%`, left: '50%' }}
@@ -384,21 +453,29 @@ export default function LetterParty() {
                 {word.tibetan}
               </button>
             )}
+
             {phase === 'over' && word && (
-              <div className="rain-over-card">
-                <h2>{bo.modules.partyOverTitle}</h2>
+              <div className="rain-over">
+                <p className="rain-over-kicker">{bo.modules.partyOverTitle}</p>
                 <p className="rain-over-word tibetan">{word.tibetan}</p>
                 <p className="rain-over-answer" dir="ltr">
                   {bo.modules.partyOverAnswer}: {hintAnswers[0] || word.english}
                 </p>
-                <p className="party-done-score" dir="ltr">
+                <p className="rain-over-score" dir="ltr">
                   {score}
                 </p>
-                <div className="party-done-actions">
+                <div className="rain-over-actions">
                   <button type="button" className="btn btn-primary" onClick={() => start(theme)}>
                     {bo.modules.partyPlayAgain}
                   </button>
-                  <button type="button" className="btn btn-ghost" onClick={() => setPhase('lobby')}>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() => {
+                      phaseRef.current = 'lobby'
+                      setPhase('lobby')
+                    }}
+                  >
                     {bo.modules.partyChangeLevel}
                   </button>
                 </div>
@@ -411,22 +488,24 @@ export default function LetterParty() {
               <label className="rain-type-label" htmlFor="rain-input">
                 {bo.modules.partyTypeHint}
               </label>
-              <input
-                id="rain-input"
-                ref={inputRef}
-                className="rain-input"
-                dir="ltr"
-                autoComplete="off"
-                autoCapitalize="off"
-                autoCorrect="off"
-                spellCheck={false}
-                value={input}
-                onChange={onInput}
-                placeholder="water, dog, mother…"
-              />
-              <button type="submit" className="btn btn-primary">
-                {bo.modules.partyGo}
-              </button>
+              <div className="rain-type-row">
+                <input
+                  id="rain-input"
+                  ref={inputRef}
+                  className="rain-input"
+                  dir="ltr"
+                  autoComplete="off"
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  value={input}
+                  onChange={onInput}
+                  placeholder="water, dog, mother…"
+                />
+                <button type="submit" className="btn btn-primary rain-go">
+                  {bo.modules.partyGo}
+                </button>
+              </div>
             </form>
           )}
         </section>

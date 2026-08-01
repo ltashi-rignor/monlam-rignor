@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import random
 import re
 from typing import Any, Literal
 from uuid import UUID
@@ -15,16 +16,16 @@ from app.services.llm import get_llm
 router = APIRouter(prefix="/games", tags=["games"])
 
 THEMES = {
-    "all": "everyday beginner Tibetan for kids (mixed topics)",
-    "animals": "animals kids know",
-    "family": "family members",
-    "nature": "nature: sun, moon, water, mountain, flower, star",
-    "food": "food and drink",
-    "greetings": "simple greetings and polite words",
-    "numbers": "numbers one through ten",
+    "all": "everyday beginner Tibetan for kids (mixed topics: animals, family, nature, food, school, body, colors, weather)",
+    "animals": "many different animals kids know (pets, farm, wild, birds, insects)",
+    "family": "family and people (parents, siblings, grandparents, friends, teacher)",
+    "nature": "nature and outdoors (sky, earth, water, plants, weather, places)",
+    "food": "food and drink kids eat",
+    "greetings": "greetings, polite words, and simple classroom phrases",
+    "numbers": "numbers and counting words (one through twenty, plus simple quantity words)",
 }
 
-# Used only if Melong is unavailable — keep short.
+# Broader fallback if Melong is down — still theme-diverse.
 _FALLBACK: dict[str, list[dict[str, str]]] = {
     "animals": [
         {"tibetan": "ཁྱི", "english": "dog", "wylie": "khyi"},
@@ -32,12 +33,35 @@ _FALLBACK: dict[str, list[dict[str, str]]] = {
         {"tibetan": "རྟ", "english": "horse", "wylie": "rta"},
         {"tibetan": "གཡག", "english": "yak", "wylie": "g.yag"},
         {"tibetan": "བྱ", "english": "bird", "wylie": "bya"},
+        {"tibetan": "ཉ", "english": "fish", "wylie": "nya"},
+        {"tibetan": "ཕག་པ", "english": "pig", "wylie": "phag pa"},
+        {"tibetan": "ར་མ", "english": "goat", "wylie": "ra ma"},
+        {"tibetan": "ལུག", "english": "sheep", "wylie": "lug"},
+        {"tibetan": "གླང་ཆེན", "english": "elephant", "wylie": "glang chen"},
+        {"tibetan": "སེང་གེ", "english": "lion", "wylie": "seng ge"},
+        {"tibetan": "སྟག", "english": "tiger", "wylie": "stag"},
+        {"tibetan": "དོམ", "english": "bear", "wylie": "dom"},
+        {"tibetan": "ཝ་མོ", "english": "fox", "wylie": "wa mo"},
+        {"tibetan": "བྱི་ལ་", "english": "mouse", "wylie": "byi la"},
+        {"tibetan": "སྦལ་པ", "english": "frog", "wylie": "sbal pa"},
+        {"tibetan": "སྦྲང་མ", "english": "bee", "wylie": "sbrang ma"},
+        {"tibetan": "འབུ་སྲིན", "english": "insect", "wylie": "'bu srin"},
+        {"tibetan": "བྱ་གག", "english": "chicken", "wylie": "bya gag"},
+        {"tibetan": "ངང་པ", "english": "duck", "wylie": "ngang pa"},
     ],
     "family": [
         {"tibetan": "ཨ་མ", "english": "mother", "wylie": "a ma"},
         {"tibetan": "ཨ་པ", "english": "father", "wylie": "a pa"},
         {"tibetan": "བུ", "english": "son", "wylie": "bu"},
         {"tibetan": "བུ་མོ", "english": "girl", "wylie": "bu mo"},
+        {"tibetan": "སྤུན", "english": "sibling", "wylie": "spun"},
+        {"tibetan": "མེས་པོ", "english": "grandfather", "wylie": "mes po"},
+        {"tibetan": "རྨོ་མོ", "english": "grandmother", "wylie": "rmo mo"},
+        {"tibetan": "གྲོགས་པོ", "english": "friend", "wylie": "grogs po"},
+        {"tibetan": "དགེ་རྒན", "english": "teacher", "wylie": "dge rgan"},
+        {"tibetan": "སློབ་ཕྲུག", "english": "student", "wylie": "slob phrug"},
+        {"tibetan": "མི", "english": "person", "wylie": "mi"},
+        {"tibetan": "བྱིས་པ", "english": "child", "wylie": "byis pa"},
     ],
     "nature": [
         {"tibetan": "ཆུ", "english": "water", "wylie": "chu"},
@@ -45,15 +69,40 @@ _FALLBACK: dict[str, list[dict[str, str]]] = {
         {"tibetan": "ཉི་མ", "english": "sun", "wylie": "nyi ma"},
         {"tibetan": "ཟླ་བ", "english": "moon", "wylie": "zla ba"},
         {"tibetan": "མེ་ཏོག", "english": "flower", "wylie": "me tog"},
+        {"tibetan": "སྐར་མ", "english": "star", "wylie": "skar ma"},
+        {"tibetan": "མེ", "english": "fire", "wylie": "me"},
+        {"tibetan": "རླུང", "english": "wind", "wylie": "rlung"},
+        {"tibetan": "ཆར་པ", "english": "rain", "wylie": "char pa"},
+        {"tibetan": "གངས", "english": "snow", "wylie": "gangs"},
+        {"tibetan": "ཤིང", "english": "tree", "wylie": "shing"},
+        {"tibetan": "ནགས", "english": "forest", "wylie": "nags"},
+        {"tibetan": "མཚོ", "english": "lake", "wylie": "mtsho"},
+        {"tibetan": "གནམ", "english": "sky", "wylie": "gnam"},
+        {"tibetan": "ས་ཆ", "english": "land", "wylie": "sa cha"},
+        {"tibetan": "རྡོ", "english": "stone", "wylie": "rdo"},
     ],
     "food": [
         {"tibetan": "ཇ", "english": "tea", "wylie": "ja"},
         {"tibetan": "འོ་མ", "english": "milk", "wylie": "'o ma"},
         {"tibetan": "འབྲས", "english": "rice", "wylie": "'bras"},
+        {"tibetan": "ཤ", "english": "meat", "wylie": "sha"},
+        {"tibetan": "བག་ལེབ", "english": "bread", "wylie": "bag leb"},
+        {"tibetan": "ཤིང་ཏོག", "english": "fruit", "wylie": "shing tog"},
+        {"tibetan": "སྔོ་ཚལ", "english": "vegetable", "wylie": "sngo tshal"},
+        {"tibetan": "ཆུ", "english": "water", "wylie": "chu"},
+        {"tibetan": "མར", "english": "butter", "wylie": "mar"},
+        {"tibetan": "ཞོ", "english": "yogurt", "wylie": "zho"},
+        {"tibetan": "སྐྱུར་རྩི", "english": "candy", "wylie": "skyur rtsi"},
+        {"tibetan": "ཁུ་བ", "english": "soup", "wylie": "khu ba"},
     ],
     "greetings": [
         {"tibetan": "བཀྲ་ཤིས་བདེ་ལེགས།", "english": "hello", "wylie": "bkra shis bde legs"},
         {"tibetan": "ཐུགས་རྗེ་ཆེ།", "english": "thank you", "wylie": "thugs rje che"},
+        {"tibetan": "དགོངས་དག", "english": "sorry", "wylie": "dgongs dag"},
+        {"tibetan": "ལགས་སོ།", "english": "yes", "wylie": "lags so"},
+        {"tibetan": "ག་རེ་འདུག", "english": "how are you", "wylie": "ga re 'dug"},
+        {"tibetan": "བདེ་མོ།", "english": "goodbye", "wylie": "bde mo"},
+        {"tibetan": "ཞུ་དགོས།", "english": "please", "wylie": "zhu dgos"},
     ],
     "numbers": [
         {"tibetan": "གཅིག", "english": "one", "wylie": "gcig"},
@@ -61,14 +110,26 @@ _FALLBACK: dict[str, list[dict[str, str]]] = {
         {"tibetan": "གསུམ", "english": "three", "wylie": "gsum"},
         {"tibetan": "བཞི", "english": "four", "wylie": "bzhi"},
         {"tibetan": "ལྔ", "english": "five", "wylie": "lnga"},
+        {"tibetan": "དྲུག", "english": "six", "wylie": "drug"},
+        {"tibetan": "བདུན", "english": "seven", "wylie": "bdun"},
+        {"tibetan": "བརྒྱད", "english": "eight", "wylie": "brgyad"},
+        {"tibetan": "དགུ", "english": "nine", "wylie": "dgu"},
+        {"tibetan": "བཅུ", "english": "ten", "wylie": "bcu"},
+        {"tibetan": "བཅུ་གཅིག", "english": "eleven", "wylie": "bcu gcig"},
+        {"tibetan": "བཅུ་གཉིས", "english": "twelve", "wylie": "bcu gnyis"},
+        {"tibetan": "ཉི་ཤུ", "english": "twenty", "wylie": "nyi shu"},
+        {"tibetan": "མང་པོ", "english": "many", "wylie": "mang po"},
+        {"tibetan": "ཉུང་ཉུང", "english": "few", "wylie": "nyung nyung"},
     ],
 }
 
 
 class VocabRainIn(BaseModel):
     theme: str = "animals"
-    count: int = Field(default=14, ge=8, le=20)
+    count: int = Field(default=28, ge=12, le=40)
     difficulty: Literal["easy", "medium"] = "easy"
+    # Optional seeds the model should avoid repeating
+    exclude: list[str] = Field(default_factory=list, max_length=40)
 
 
 class VocabWordOut(BaseModel):
@@ -112,7 +173,6 @@ def _answers_for(english: str, wylie: str, extra: list[Any] | None = None) -> li
         n = _norm_answer(str(item))
         if n:
             out.append(n)
-    # unique preserve order
     seen: set[str] = set()
     uniq: list[str] = []
     for a in out:
@@ -122,14 +182,16 @@ def _answers_for(english: str, wylie: str, extra: list[Any] | None = None) -> li
     return uniq
 
 
-def _normalize_words(raw: Any, theme: str, count: int) -> list[VocabWordOut]:
+def _normalize_words(raw: Any, theme: str, count: int, exclude: set[str] | None = None) -> list[VocabWordOut]:
     items = raw
     if isinstance(raw, dict):
         items = raw.get("words") or raw.get("items") or []
     if not isinstance(items, list):
         return []
 
+    exclude = exclude or set()
     words: list[VocabWordOut] = []
+    seen_bo: set[str] = set()
     for i, item in enumerate(items):
         if not isinstance(item, dict):
             continue
@@ -138,15 +200,17 @@ def _normalize_words(raw: Any, theme: str, count: int) -> list[VocabWordOut]:
         wylie = str(item.get("wylie") or item.get("latin") or "").strip()
         if not tibetan or not english or not _has_tibetan(tibetan):
             continue
+        if tibetan in seen_bo or tibetan in exclude:
+            continue
         extra = item.get("answers") if isinstance(item.get("answers"), list) else []
         answers = _answers_for(english, wylie, extra)
         if not answers:
             continue
-        # Prefer short typeable English as primary label
+        seen_bo.add(tibetan)
         primary = answers[0]
         words.append(
             VocabWordOut(
-                id=f"ai-{theme}-{i}-{abs(hash(tibetan)) % 100000}",
+                id=f"ai-{theme}-{abs(hash(tibetan + primary)) % 1_000_000}-{i}",
                 tibetan=tibetan,
                 english=primary,
                 wylie=wylie,
@@ -159,20 +223,21 @@ def _normalize_words(raw: Any, theme: str, count: int) -> list[VocabWordOut]:
     return words
 
 
-def _fallback_words(theme: str, count: int) -> list[VocabWordOut]:
-    key = theme if theme in _FALLBACK else "nature"
-    base = list(_FALLBACK.get(key) or [])
+def _fallback_words(theme: str, count: int, exclude: set[str] | None = None) -> list[VocabWordOut]:
+    exclude = exclude or set()
     if theme == "all":
         base = [w for group in _FALLBACK.values() for w in group]
-    # cycle if needed
+    else:
+        base = list(_FALLBACK.get(theme) or _FALLBACK["nature"])
+    random.shuffle(base)
     out: list[VocabWordOut] = []
-    i = 0
-    while len(out) < count and base:
-        item = base[i % len(base)]
+    for item in base:
+        if item["tibetan"] in exclude:
+            continue
         answers = _answers_for(item["english"], item.get("wylie", ""))
         out.append(
             VocabWordOut(
-                id=f"fb-{theme}-{len(out)}",
+                id=f"fb-{theme}-{abs(hash(item['tibetan'])) % 1_000_000}-{len(out)}",
                 tibetan=item["tibetan"],
                 english=answers[0] if answers else item["english"],
                 wylie=item.get("wylie", ""),
@@ -180,10 +245,57 @@ def _fallback_words(theme: str, count: int) -> list[VocabWordOut]:
                 theme=theme,
             )
         )
-        i += 1
-        if i > count * 3:
+        if len(out) >= count:
             break
+    # If still short, fill from all themes
+    if len(out) < count:
+        extra = [w for group in _FALLBACK.values() for w in group]
+        random.shuffle(extra)
+        have = {w.tibetan for w in out} | exclude
+        for item in extra:
+            if item["tibetan"] in have:
+                continue
+            answers = _answers_for(item["english"], item.get("wylie", ""))
+            out.append(
+                VocabWordOut(
+                    id=f"fb-mix-{len(out)}",
+                    tibetan=item["tibetan"],
+                    english=answers[0] if answers else item["english"],
+                    wylie=item.get("wylie", ""),
+                    answers=answers,
+                    theme=theme,
+                )
+            )
+            have.add(item["tibetan"])
+            if len(out) >= count:
+                break
     return out
+
+
+def _ask_melong(theme: str, topic: str, level: str, count: int, exclude: list[str]) -> list[VocabWordOut]:
+    system = (
+        "You generate Tibetan vocabulary for a children's typing game. "
+        "Return JSON only with key 'words': an array of objects. "
+        "Each object MUST have: tibetan (Tibetan script), english (short English kids can type), "
+        "wylie (Extended Wylie), answers (array of 1-3 acceptable English type-ins, lowercase). "
+        "Rules: real standard Tibetan only; english answers must be simple (one or two words); "
+        "ALL items must be unique; cover many different words in the theme; "
+        "no sentences; no invented words; no markdown."
+    )
+    avoid = ""
+    if exclude:
+        avoid = "Do NOT repeat these Tibetan words: " + " · ".join(exclude[:30]) + ".\n"
+    user = (
+        f"Theme: {theme} ({topic}).\n"
+        f"Difficulty: {level}.\n"
+        f"{avoid}"
+        f"Generate exactly {count} DIFFERENT unique words. Maximize variety.\n"
+        "Example item: "
+        '{"tibetan":"ཆུ","english":"water","wylie":"chu","answers":["water"]}'
+    )
+    llm = get_llm()
+    data = llm.complete_json(system, user, max_tokens=4096, temperature=0.85, retries=1)
+    return _normalize_words(data, theme, count, exclude=set(exclude))
 
 
 @router.post("/vocab-rain", response_model=VocabRainOut)
@@ -193,36 +305,49 @@ def generate_vocab_rain(
 ):
     theme = body.theme if body.theme in THEMES or body.theme == "all" else "animals"
     topic = THEMES.get(theme, THEMES["animals"])
-    level = "very easy single words kids can type" if body.difficulty == "easy" else "simple words and short phrases"
-
-    system = (
-        "You generate Tibetan vocabulary for a children's typing game. "
-        "Return JSON only with key 'words': an array of objects. "
-        "Each object MUST have: tibetan (Tibetan script), english (short English kids can type), "
-        "wylie (Extended Wylie), answers (array of 1-3 acceptable English type-ins, lowercase). "
-        "Rules: real standard Tibetan only; english answers must be simple (one or two words); "
-        "no sentences; no honorific-only rare terms; no invented words; no markdown."
+    level = (
+        "very easy single words kids can type"
+        if body.difficulty == "easy"
+        else "simple words and short phrases"
     )
-    user = (
-        f"Theme: {theme} ({topic}).\n"
-        f"Difficulty: {level}.\n"
-        f"Generate exactly {body.count} unique words for a falling-word typing game.\n"
-        "Example item: "
-        '{"tibetan":"ཆུ","english":"water","wylie":"chu","answers":["water"]}'
-    )
+    exclude = [e.strip() for e in body.exclude if e and e.strip()][:40]
+    want = body.count
 
+    words: list[VocabWordOut] = []
+    source: Literal["ai", "fallback"] = "fallback"
     try:
-        llm = get_llm()
-        data = llm.complete_json(system, user, max_tokens=2048, temperature=0.55, retries=1)
-        words = _normalize_words(data, theme, body.count)
-        if len(words) >= max(6, body.count // 2):
-            return VocabRainOut(theme=theme, words=words[: body.count], source="ai")
+        # First batch
+        batch = _ask_melong(theme, topic, level, want, exclude)
+        words.extend(batch)
+        source = "ai"
+        # If Melong returned a thin list, ask once more for fresh words
+        if len(words) < max(12, want // 2):
+            more_exclude = exclude + [w.tibetan for w in words]
+            extra = _ask_melong(theme, topic, level, want, more_exclude)
+            seen = {w.tibetan for w in words}
+            for w in extra:
+                if w.tibetan in seen:
+                    continue
+                words.append(w)
+                seen.add(w.tibetan)
+                if len(words) >= want:
+                    break
     except Exception:
-        # Fall through to static pack so the game still works offline / on LLM errors.
-        pass
+        words = []
 
-    return VocabRainOut(
-        theme=theme,
-        words=_fallback_words(theme, body.count),
-        source="fallback",
-    )
+    if len(words) < 8:
+        words = _fallback_words(theme, want, exclude=set(exclude))
+        source = "fallback"
+    elif len(words) < want:
+        # Top up with fallback uniques so the pack feels full
+        have = {w.tibetan for w in words} | set(exclude)
+        for w in _fallback_words(theme, want, exclude=have):
+            if w.tibetan in have:
+                continue
+            words.append(w)
+            have.add(w.tibetan)
+            if len(words) >= want:
+                break
+
+    random.shuffle(words)
+    return VocabRainOut(theme=theme, words=words[:want], source=source)
