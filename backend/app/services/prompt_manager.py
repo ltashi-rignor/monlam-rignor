@@ -90,6 +90,63 @@ def grammar_user(text: str, retrieved: list[dict[str, Any]]) -> str:
     )
 
 
+def grammar_game_system() -> str:
+    return (
+        "You are the Grammar Quest Agent for Monlam Rignor — a kid-friendly Tibetan "
+        "grammar mini-game. Build exactly 5 game rounds using ONLY the retrieved Classical "
+        "Tibetan Grammar Handbook passages as your knowledge source. "
+        f"{LANG_RULE} "
+        "Mix round types: at least 2 of type 'spot' and at least 2 of type 'pick'. "
+        "spot: sentence MUST contain ONE deliberate WRONG form a child can tap. "
+        "error_span = that wrong substring (exact). answer = the CORRECT replacement "
+        "and MUST be different from error_span. Never use spot for comprehension "
+        "('what does X mean') or for highlighting a correct phrase. "
+        "pick: ALWAYS a fill-in-the-blank. sentence MUST contain the marker ______ "
+        "where the missing word/phrase goes — do NOT write the answer inside sentence. "
+        "options: exactly 4 DISTINCT Tibetan choices (no near-duplicates that only differ "
+        "by ། or ་). answer = the correct option string (must match one option exactly). "
+        "Bad example options: དགའ་པོ་ / དགའ་པོ། / དགའ་པོ་ཡོད། — do not do that. "
+        "Good example: sentence 'ང་སློབ་གྲྭ་______ འགྲོ།' options ལ / གིས / ནས / དང་. "
+        "For yes/no questions in school spoken Tibetan prefer particle པས། "
+        "(do NOT invent forms like ནམས།). "
+        "Use natural kid-level Tibetan; keep case markers accurate "
+        "(ལ destination, ནས source, གིས/གྱིས agent, གི/ཀྱི/གྱི/ཡི genitive). "
+        "prompt, explanation, related_rule, source_ref MUST be Tibetan script. "
+        "Keep sentences short (kid level). Do not invent rules absent from sources. "
+        "Output JSON: { rounds: [{id, type, prompt, sentence, error_span, options, "
+        "answer, explanation, related_rule, source_ref}] }."
+    )
+
+
+def grammar_game_user(
+    topic: str,
+    retrieved: list[dict[str, Any]],
+    recent_mistakes: list[dict[str, Any]] | None = None,
+) -> str:
+    sources = "\n\n".join(
+        f"[Source p.{r.get('page_number')}] {r.get('content', '')[:2000]}"
+        for r in retrieved
+    )
+    mistakes_block = ""
+    if recent_mistakes:
+        lines = []
+        for m in recent_mistakes[:6]:
+            lines.append(
+                f"- {m.get('original') or ''} → {m.get('correction') or ''} "
+                f"({m.get('mistake_type') or ''})"
+            )
+        mistakes_block = "Learner recent mistakes (theme inspiration):\n" + "\n".join(lines) + "\n\n"
+    return (
+        f"Topic key: {topic}\n"
+        f"{mistakes_block}"
+        "Retrieved Classical Tibetan Grammar Handbook passages (primary knowledge source):\n"
+        f"{sources or '(no passages retrieved — still create simple kid-safe rounds)'}\n\n"
+        "Create exactly 5 grammar game rounds for children. "
+        "Pick rounds MUST use ______ blanks and 4 clearly different options. "
+        "Ground explanations in the sources when present. JSON only."
+    )
+
+
 def essay_system() -> str:
     return (
         "You are the Essay Evaluation Agent for Tibetan writing only. "
@@ -204,20 +261,24 @@ def planner_tibetanize_user(roadmap: dict[str, Any]) -> str:
 def interactive_lesson_system() -> str:
     return (
         "You are the Interactive Lesson Agent for Monlam Rignor. "
-        "Build one short kid-friendly interactive Tibetan lesson from the learner profile "
+        "Build one rich kid-friendly interactive Tibetan lesson from the learner profile "
         "and a single roadmap lesson item. "
         f"{LANG_RULE} "
+        "Make content feel like a real classroom mini-lesson — not a word list. "
         "title, tibetan_title, focus, level, notes, word tibetan fields, dialogue tibetan, "
-        "and quiz questions/options MUST be Tibetan script. "
-        "wylie may use Latin transliteration. "
-        "english meaning fields: short simple English gloss only (for bilingual kids). "
+        "quiz questions, and example sentences MUST be Tibetan script. "
+        "wylie: Extended Wylie Latin. english / example_en: short simple English. "
         "Output compact valid JSON with keys: "
-        "title, tibetan_title, focus, level, minutes (int 6-15), "
-        "words[{id, tibetan, wylie, english}] (exactly 4 items), "
-        "dialogue[{speaker: A|B, tibetan, wylie, english}] (2-4 lines), "
-        "notes (1-3 Tibetan sentences), "
-        "quiz[{q, options[4 Tibetan or mixed strings], answer (0-3 index)}] (exactly 3 items). "
-        "Theme content around the child's likes/favorites and the roadmap lesson focus."
+        "title, tibetan_title, focus, level, minutes (int 10-15), "
+        "words[{id, tibetan, wylie, english, example, example_en}] (exactly 6 items; "
+        "example = one natural Tibetan sentence using the word), "
+        "dialogue[{speaker: A|B, tibetan, wylie, english}] (exactly 6 lines; a real conversation), "
+        "notes (3-5 Tibetan teaching sentences: meaning, usage, polite forms — NO mention of AI/offline), "
+        "quiz[{q, options[4], answer (0-3), highlight}] (exactly 3 items; mix: "
+        "1 meaning, 1 fill-in-the-blank with Tibetan options, 1 usage/context; "
+        "highlight = the key Tibetan word in q, or empty string). "
+        "Theme tightly around the child's likes/favorites and the roadmap lesson focus. "
+        "Use correct everyday Tibetan; avoid invented words."
     )
 
 
@@ -227,7 +288,7 @@ def interactive_lesson_user(
     week_meta: dict[str, Any],
 ) -> str:
     return (
-        "Create one interactive Tibetan lesson for this learner.\n"
+        "Create one rich interactive Tibetan lesson for this learner.\n"
         f"Name: {profile.get('name')}\n"
         f"Age: {profile.get('age')}\n"
         f"Class/grade: {profile.get('school_class')}\n"
@@ -239,5 +300,7 @@ def interactive_lesson_user(
         f"Roadmap lesson type: {roadmap_lesson.get('lesson_type') or roadmap_lesson.get('type')}\n"
         f"Roadmap lesson description: {roadmap_lesson.get('content') or roadmap_lesson.get('description')}\n"
         f"Week number: {roadmap_lesson.get('week_number')}\n"
+        "Requirements: 6 vocab with example sentences, 6-line dialogue, teaching notes, "
+        "3 varied quiz items. Kid-friendly but linguistically accurate.\n"
         "JSON only. No markdown."
     )

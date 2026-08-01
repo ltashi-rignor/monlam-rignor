@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import { useModuleProgress } from '../hooks/useModuleProgress'
 import { bo } from '../i18n/bo'
-import { tibetanOrFallback } from '../i18n/labels'
+import { statusBo, tibetanOrFallback } from '../i18n/labels'
 
 export default function Lessons() {
-  const { progress } = useModuleProgress()
+  const { progress, refresh } = useModuleProgress()
   const doneSet = progress.completed_lessons || []
   const [lessons, setLessons] = useState([])
   const [meta, setMeta] = useState({ plan_title: '', current_week: 1, message: '' })
@@ -19,6 +19,7 @@ export default function Lessons() {
       setLoading(true)
       setError('')
       try {
+        await refresh()
         const data = await api.listInteractiveLessons()
         if (cancelled) return
         setLessons(data.lessons || [])
@@ -36,7 +37,27 @@ export default function Lessons() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [refresh])
+
+  const stats = useMemo(() => {
+    const total = lessons.length
+    const completed = lessons.filter(
+      (l) => l.status === 'completed' || doneSet.includes(l.id),
+    ).length
+    const inProgress = lessons.filter(
+      (l) =>
+        l.status === 'in_progress' &&
+        !doneSet.includes(l.id) &&
+        l.status !== 'completed',
+    ).length
+    const weighted = completed + inProgress * 0.5
+    return {
+      total,
+      completed,
+      inProgress,
+      pct: total ? Math.round((weighted / total) * 100) : 0,
+    }
+  }, [lessons, doneSet])
 
   return (
     <div className="module-page tibetan">
@@ -74,14 +95,35 @@ export default function Lessons() {
         <div className="empty panel">{bo.modules.noPathLessons}</div>
       )}
 
+      {!loading && lessons.length > 0 && (
+        <div className="path-overview panel" style={{ marginBottom: 16 }}>
+          <div className="path-overview-stats">
+            <div className="stat-chip">
+              <span>{bo.learningPath.progress}</span>
+              <strong dir="ltr">
+                {stats.completed}/{stats.total} · {stats.pct}%
+              </strong>
+            </div>
+            <div className="stat-chip">
+              <span>{bo.modules.xp}</span>
+              <strong dir="ltr">{progress.xp || 0}</strong>
+            </div>
+          </div>
+          <div className="overview-progress" aria-hidden>
+            <div className="overview-progress-fill" style={{ width: `${stats.pct}%` }} />
+          </div>
+        </div>
+      )}
+
       <div className="lessons-list">
         {lessons.map((l, i) => {
-          const done = doneSet.includes(l.id)
+          const done = l.status === 'completed' || doneSet.includes(l.id)
+          const inProgress = !done && l.status === 'in_progress'
           const title = tibetanOrFallback(l.tibetan_title || l.title, l.title)
           const focus = tibetanOrFallback(l.focus, '')
           return (
             <Link key={l.id} to={`/lessons/${l.id}`} className="lesson-row panel">
-              <div className={`lesson-num ${done ? 'is-done' : ''}`}>
+              <div className={`lesson-num ${done ? 'is-done' : ''} ${inProgress ? 'is-active' : ''}`}>
                 {done ? '✓' : String(i + 1).padStart(2, '0')}
               </div>
               <div className="lesson-row-body">
@@ -90,6 +132,7 @@ export default function Lessons() {
                   <span className="chip">
                     {bo.learningPath.week} {l.week_number}
                   </span>
+                  <span className="chip">{statusBo(done ? 'completed' : l.status || 'pending')}</span>
                   {l.ready && <span className="chip chip-ready">{bo.modules.ready}</span>}
                 </div>
                 {focus && <p className="muted">{focus}</p>}

@@ -1,0 +1,280 @@
+topics:
+  particles:
+    label: ཕྲད།
+    hint: དྲི་བའི་ཕྲད་པས།
+    query: ཕྲད། དྲི་བ པས particles classical Tibetan grammar
+  case:
+    label: རྣམ་དབྱེ།
+    hint: གིས། ལ། ནས། ཀྱི།
+    query: རྣམ་དབྱེ། case markers གིས ལ ནས ཀྱི classical Tibetan grammar
+  honorific:
+    label: ཞེ་ས།
+    hint: གནང་། ཕེབས། གསོལ།
+    query: ཞེ་ས། honorific polite forms གནང ཕེབས classical Tibetan grammar
+  verbs:
+    label: བྱ་ཚིག
+    hint: ཡིན། ཡོད། བཞིན།
+    query: བྱ་ཚིག verb ཡིན ཡོད བྱེད classical Tibetan grammar
+  mistakes:
+    label: ངའི་ནོར་འཁྲུལ།
+    hint: ཉེ་ཆར་གྱི་ནོར་བ།
+    query: བོད་ཡིག་བརྡ་སྤྲོད། ཕྲད། རྣམ་དབྱེ། ཞེ་ས།
+rounds:
+  particles:
+  - id: p1
+    type: spot
+    prompt: ནོར་བའི་ཚིག་ལ་མནན།
+    sentence: ཁྱེད་རང་འགྲོ་གི་ཡིན་དང་།
+    error_span: དང་
+    answer: པས།
+    options: []
+    explanation: དྲི་བ་བྱེད་སྐབས་ཕྲད་པས། སྤྱོད། དང་ནི་སྡུད་པའི་ཕྲད་ཡིན།
+    related_rule: དྲི་བའི་ཕྲད་པས།
+    source_ref: ཕྲད།
+  - id: p2
+    type: pick
+    prompt: སྟོང་ཆར་གང་འཇུག
+    sentence: ཁོང་སློབ་གྲྭ་ལ་འགྲོ་གི་ཡོད ______
+    error_span: ''
+    answer: པས།
+    options:
+    - པས།
+    - དང་།
+    - ནས།
+    - ཀྱི།
+    explanation: ཡིན་ནམ་མིན་གྱི་དྲི་བ་ལ་པས། སྤྱོད།
+    related_rule: དྲི་བའི་ཕྲད་པས།
+    source_ref: ཕྲད།
+  - id: p3
+    type: spot
+    prompt: ནོར་བ་གང་ཡིན།
+    sentence: ཁྱེད་རང་ཇ་འཐུང་གི་ཡོད་ནས།
+    error_span: ནས
+    answer: པས།
+    options: []
+    explanation: ནས་ནི་འབྱུང་ཁུངས་ཀྱི་རྣམ་དབྱེ། དྲི་བ་ལ་པས། དགོས།
+    related_rule: དྲི་བའི་ཕྲད་པས།
+    source_ref: ཕྲད།
+  - id: p4
+    type: pick
+    prompt: དྲི་བའི་ཕྲད་འདེམས།
+    sentence: ཁྱེད་རང་བདེ་པོ་ཡིན ______
+    error_span: ''
+    answer: པས།
+    options:
+    - པས།
+    - དང་།
+    - གིས།
+    - ནས།
+    explanation: བདེ་པོ་ཡིན་པས། ཞེས་དྲི་བ་བྱེད།
+    related_rule: དྲི་བའི་ཕྲད་པས།
+    source_ref: ཕྲད།
+  - id: p5
+    type: pick
+    prompt: ཚིག་གང་ཡང་དག་ཡིན།
+    sentence: ______
+    error_span: ''
+    answer: ཁྱེད་རང་འགྲོ་གི་ཡིན་པས།
+    options:
+    - ཁྱེད་རང་འགྲོ་གི་ཡིན་པས།
+    - ཁྱེད་རང་འགྲོ་གི་ཡིན་དང་།
+    - ཁྱེད་རང་འགྲོ་གི་ཡིན་ནས།
+    - ཁྱེད་རང་འགྲོ་གི་ཡིན་གིས།
+    explanation: དྲི་བ་ཡང་དག་པ་ནི་…ཡིན་པས། ཡིན།
+    related_rule: དྲི་བའི་ཕྲད་པས།
+    source_ref: ཕྲད།
+  case:
+  - id: c1
+    type: spot
+    prompt: ནོར་བའི་རྣམ་དབྱེ་ལ་མནན།
+    sentence: ང་སློབ་གྲྭ་གིས་འགྲོ།
+    error_span: གིས
+    answer: ལ
+    options: []
+    explanation: ཕྱོགས་སམ་ཡུལ་ལ་ལ་སྤྱོད། གིས་ནི་བྱེད་པ་པོའི་རྣམ་དབྱེ་ཡིན།
+    related_rule: ལ་— ཡུལ།
+    source_ref: རྣམ་དབྱེ།
+  - id: c2
+    type: pick
+    prompt: བྱེད་པ་པོའི་རྣམ་དབྱེ་འདེམས།
+    sentence: དགེ་རྒན ______ དེབ་བཀླགས།
+    error_span: ''
+    answer: གྱིས
+    options:
+    - གྱིས
+    - ལ
+    - ནས
+    - དང་
+    explanation: རྒན་གྱི་མཐའ་ན་ཡིན་པས་གྱིས་སྤྱོད།
+    related_rule: བྱེད་པ་པོའི་རྣམ་དབྱེ།
+    source_ref: རྣམ་དབྱེ།
+  - id: c3
+    type: spot
+    prompt: ནོར་བ་གང་ཡིན།
+    sentence: བུ་དེ་སློབ་གྲྭ་ནས་འགྲོ།
+    error_span: ནས
+    answer: ལ
+    options: []
+    explanation: སློབ་གྲྭ་ལ་འགྲོ། ཞེས་ཡུལ་ལ་ལ་སྤྱོད། ནས་ནི་འབྱུང་ཁུངས་ཡིན།
+    related_rule: ལ་— ཡུལ། ནས་— འབྱུང་ཁུངས།
+    source_ref: རྣམ་དབྱེ།
+  - id: c4
+    type: pick
+    prompt: འབྲེལ་སྒྲ་གང་དགོས།
+    sentence: བུ་མོ ______ དེབ་ཡིན།
+    error_span: ''
+    answer: ཡི
+    options:
+    - ཡི
+    - ལ
+    - ནས
+    - གིས
+    explanation: མོ་མཐའ་ཅན་ལ་ཡི་སྤྱོད། བུ་མོའི་དེབ།
+    related_rule: འབྲེལ་སྒྲ།
+    source_ref: རྣམ་དབྱེ།
+  - id: c5
+    type: pick
+    prompt: ཡུལ་གྱི་རྣམ་དབྱེ་འདེམས།
+    sentence: བུ་མོ་དེ་སློབ་གྲྭ ______ འགྲོ།
+    error_span: ''
+    answer: ལ
+    options:
+    - ལ
+    - གིས
+    - ནས
+    - དང་
+    explanation: སློབ་གྲྭ་ལ་འགྲོ། ཞེས་ཡུལ་ལ་ལ་སྤྱོད།
+    related_rule: ལ་— ཡུལ།
+    source_ref: རྣམ་དབྱེ།
+  honorific:
+  - id: h1
+    type: spot
+    prompt: ཞེ་ས་མ་བཏང་བའི་ཚིག་ལ་མནན།
+    sentence: དགེ་རྒན་ལགས་ག་རེ་བྱེད་ཀྱི་ཡོད།
+    error_span: བྱེད
+    answer: གནང
+    options: []
+    explanation: དགེ་རྒན་ལ་ཞེ་སའི་བྱ་ཚིག་གནང་སྤྱོད། ག་རེ་གནང་གི་ཡོད།
+    related_rule: གནང་— ཞེ་སའི་བྱེད།
+    source_ref: ཞེ་ས།
+  - id: h2
+    type: pick
+    prompt: ཞེ་སའི་ཚིག་འདེམས།
+    sentence: ཁྱེད་རང་ག་ལེར ______
+    error_span: ''
+    answer: ཕེབས།
+    options:
+    - ཕེབས།
+    - འགྲོ།
+    - སྡོད།
+    - བྱེད།
+    explanation: ཕེབས་ནི་འགྲོ་བའི་ཞེ་ས།
+    related_rule: ཕེབས་— ཞེ་ས།
+    source_ref: ཞེ་ས།
+  - id: h3
+    type: spot
+    prompt: ནོར་བ་གང་ཡིན།
+    sentence: ཁོང་ཇ་འཐུང་གི་ཡོད།
+    error_span: འཐུང
+    answer: གསོལ
+    options: []
+    explanation: ཞེ་སར་འཐུང་གི་ཚབ་ཏུ་གསོལ་སྤྱོད།
+    related_rule: གསོལ་— ཞེ་ས།
+    source_ref: ཞེ་ས།
+  - id: h4
+    type: pick
+    prompt: སྡོད་པའི་ཞེ་ས་འདེམས།
+    sentence: དགེ་རྒན་ལགས་འདིར ______
+    error_span: ''
+    answer: བཞུགས།
+    options:
+    - བཞུགས།
+    - སྡོད།
+    - འདུག
+    - ཡོད།
+    explanation: བཞུགས་ནི་སྡོད་པའི་ཞེ་ས།
+    related_rule: བཞུགས་— ཞེ་ས།
+    source_ref: ཞེ་ས།
+  - id: h5
+    type: pick
+    prompt: བཀའ་དྲིན་ཞུ་བའི་ཚིག་འདེམས།
+    sentence: རོགས་རམ་གནང་བར ______
+    error_span: ''
+    answer: ཐུགས་རྗེ་ཆེ།
+    options:
+    - ཐུགས་རྗེ་ཆེ།
+    - ལགས་སོ།
+    - དགོངས་དག
+    - བཀྲ་ཤིས་བདེ་ལེགས།
+    explanation: ཐུགས་རྗེ་ཆེ། ནི་ཞེ་སའི་བཀའ་དྲིན་ཞུ།
+    related_rule: ཐུགས་རྗེ་ཆེ།
+    source_ref: ཞེ་ས།
+  verbs:
+  - id: v1
+    type: spot
+    prompt: ནོར་བའི་བྱ་ཚིག་ལ་མནན།
+    sentence: ང་དེབ་ཀློག་གི་ཡིན།
+    error_span: ཡིན
+    answer: ཡོད
+    options: []
+    explanation: བྱ་བ་བྱེད་བཞིན་པར་ཡོད་སྤྱོད། ཡིན་ནི་ངོ་བོ་སྟོན།
+    related_rule: ཡིན་དང་ཡོད།
+    source_ref: བྱ་ཚིག
+  - id: v2
+    type: pick
+    prompt: ངོ་བོ་སྟོན་པའི་ཚིག་འདེམས།
+    sentence: ཁོང་དགེ་རྒན ______
+    error_span: ''
+    answer: ཡིན།
+    options:
+    - ཡིན།
+    - ཡོད།
+    - བྱེད།
+    - འགྲོ།
+    explanation: ངོ་བོ་སྟོན་པར་ཡིན་སྤྱོད།
+    related_rule: ཡིན་— ངོ་བོ།
+    source_ref: བྱ་ཚིག
+  - id: v3
+    type: spot
+    prompt: ནོར་བ་གང་ཡིན།
+    sentence: ང་ལ་དེབ་ཡིན།
+    error_span: ཡིན
+    answer: ཡོད
+    options: []
+    explanation: ཡོད་པ་སྟོན་པར་ཡོད་སྤྱོད། ང་ལ་དེབ་ཡོད།
+    related_rule: ཡོད་— ཡོད་པ།
+    source_ref: བྱ་ཚིག
+  - id: v4
+    type: pick
+    prompt: ད་ལྟ་བྱེད་བཞིན་པའི་ཚིག་འདེམས།
+    sentence: བུ་མོ་དེ་འབྲི ______ ཡོད།
+    error_span: ''
+    answer: བཞིན
+    options:
+    - བཞིན
+    - ཟིན
+    - རྗེས
+    - སྔོན
+    explanation: ད་ལྟའི་བྱ་བ་ལ་བཞིན་སྤྱོད།
+    related_rule: བཞིན་— ད་ལྟ།
+    source_ref: བྱ་ཚིག
+  - id: v5
+    type: pick
+    prompt: མ་འོངས་པའི་ཚིག་འདེམས།
+    sentence: ང་སང་ཉིན་སློབ་གྲྭ་ལ ______
+    error_span: ''
+    answer: འགྲོ་གི་ཡིན།
+    options:
+    - འགྲོ་གི་ཡིན།
+    - འགྲོ་ཟིན།
+    - འགྲོ་གི་ཡོད།
+    - ཡིན།
+    explanation: མ་འོངས་པར་གི་ཡིན་སྤྱོད་ཆོག
+    related_rule: དུས་གསུམ།
+    source_ref: བྱ་ཚིག
+mistakes_mix:
+- particles.0
+- case.0
+- honorific.0
+- verbs.0
+- particles.1

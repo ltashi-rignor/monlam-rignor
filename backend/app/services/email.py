@@ -1,4 +1,4 @@
-"""Email OTP delivery — SMTP (Mailpit locally) with console fallback."""
+"""Email OTP delivery via SMTP (Gmail / Mailpit) with optional console log."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ async def send_otp_email(email: str, code: str) -> None:
         print(f"[DEV OTP] {email} -> {code}")
 
     message = EmailMessage()
-    message["From"] = settings.smtp_from
+    message["From"] = settings.smtp_sender
     message["To"] = email
     message["Subject"] = f"{settings.app_name} login code"
     message.set_content(
@@ -34,13 +34,29 @@ async def send_otp_email(email: str, code: str) -> None:
         "If you did not request this, ignore this email."
     )
 
+    kwargs: dict = {
+        "hostname": settings.smtp_host,
+        "port": int(settings.smtp_port),
+        "start_tls": settings.smtp_start_tls,
+    }
+    if settings.smtp_user and settings.smtp_password:
+        kwargs["username"] = settings.smtp_user
+        kwargs["password"] = settings.smtp_password
+
     try:
-        await aiosmtplib.send(
-            message,
-            hostname=settings.smtp_host,
-            port=settings.smtp_port,
-            start_tls=False,
+        await aiosmtplib.send(message, **kwargs)
+        logger.info(
+            "OTP email sent to %s via %s:%s",
+            email,
+            settings.smtp_host,
+            settings.smtp_port,
         )
     except Exception as exc:
-        # Local dev without Mailpit: OTP still available via OTP_DEV_LOG
-        logger.warning("SMTP send failed (%s); OTP logged for local development.", exc)
+        logger.warning(
+            "SMTP send failed (%s); OTP %s for local development.",
+            exc,
+            "was logged" if settings.otp_dev_log else "was NOT delivered",
+        )
+        if not settings.otp_dev_log:
+            # Surface failure when we are not relying on console OTP
+            raise

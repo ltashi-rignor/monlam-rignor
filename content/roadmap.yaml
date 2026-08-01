@@ -1,0 +1,82 @@
+title_template: '{who}་ཡི་བོད་ཡིག་སློབ་ལམ།'
+summary_template: མེ་ལོང་མི་འདུག་པས་རང་འགུལ་སློབ་ལམ་བཟོས། དགའ་པོ་{interest}་དང་མཉམ་དུ་གསལ་བྱེད། མིང་ཚིག་རོལ་རྩེད།
+  ཡིག་གཟུགས། སློབ་ཚན་བཅས་སྦྱོང་།{class_bit}
+default_who: སློབ་ཕྲུག
+default_interest: ཉིན་རེའི་སྐད་ཆ།
+weeks:
+- week_number: 1
+  focus: གསལ་བྱེད་དང་འབྲི་སྟངས།
+  goals:
+  - གསལ་བྱེད་ངོས་འཛིན།
+  - ཡིག་འབྲུ་འབྲི་སྦྱོང་།
+  - མིང་ཚིག་རོལ་རྩེད་འགོ་རྩོམ།
+  lessons:
+  - title: གསལ་བྱེད་ངོས་འཛིན།
+    description: ཀ་ཁ་ག་ང་ནས་འགོ་བཙུགས་ཏེ་གསལ་བྱེད་སློབས།
+    type: alphabet
+    estimated_minutes: 15
+  - title: ཡིག་གཟུགས་སྦྱོང་བརྡར།
+    description: དབུ་ཅན་ཐིག་རིམ་པ་བཞིན་འབྲི།
+    type: handwriting
+    estimated_minutes: 15
+  - title: མིང་ཚིག་ཆར་པ། — ཁྱིམ་ཚང་།
+    description: རོལ་རྩེད་ནང་ཁྱིམ་ཚང་གི་མིང་ཚིག་ཏེབ།
+    type: game
+    estimated_minutes: 12
+- week_number: 2
+  focus: མིང་ཚིག་དང་འཚམས་འདྲི།
+  goals:
+  - འཚམས་འདྲི་ཤེས་པ།
+  - ཉིན་རེའི་མིང་ཚིག་སྦྱོང་།
+  - རོལ་རྩེད་ཐོག་སྦྱོང་བརྡར།
+  lessons:
+  - title: འཚམས་འདྲི་སློབ་ཚན།
+    description: བཀྲ་ཤིས་བདེ་ལེགས། ཐུགས་རྗེ་ཆེ། སོགས།
+    type: vocabulary
+    estimated_minutes: 15
+  - title: མིང་ཚིག་ཆར་པ། — འཚམས་འདྲི།
+    description: རོལ་རྩེད་ནང་འཚམས་འདྲི་ཏེབ།
+    type: game
+    estimated_minutes: 12
+  - title: མིང་ཚིག་ཤོག་བུ།
+    description: ཤོག་བུ་སློག་ནས་མིང་ཚིག་དྲན།
+    type: flashcards
+    estimated_minutes: 10
+- week_number: 3
+  focus: རང་བྱུང་དང་ཁ་ཟས།
+  goals:
+  - རང་བྱུང་མིང་ཚིག
+  - ཁ་ཟས་མིང་ཚིག
+  - རོལ་རྩེད་ཐོག་སྦྱོང་།
+  lessons:
+  - title: རང་བྱུང་ཁོར་ཡུག་སློབ་ཚན།
+    description: ཉི་མ། ཆུ། རི། མེ་ཏོག་སོགས།
+    type: vocabulary
+    estimated_minutes: 15
+  - title: མིང་ཚིག་ཆར་པ། — རང་བྱུང་།
+    description: རོལ་རྩེད་ནང་རང་བྱུང་མིང་ཚིག་ཏེབ།
+    type: game
+    estimated_minutes: 12
+  - title: མིང་ཚིག་ཆར་པ། — ཁ་ཟས།
+    description: རོལ་རྩེད་ནང་ཁ་ཟས་མིང་ཚིག་ཏེབ།
+    type: game
+    estimated_minutes: 12
+- week_number: 4
+  focus: གྲངས་ཀ་དང་སེམས་ཅན།
+  goals:
+  - གྲངས་ཀ་སློབས།
+  - སེམས་ཅན་མིང་ཚིག
+  - སྦྱོང་བརྡར་རོལ་རྩེད།
+  lessons:
+  - title: གྲངས་ཀ་སློབ་ཚན།
+    description: གཅིག་ནས་བཅུ་བར་གྲངས་ཀ་སློབས།
+    type: vocabulary
+    estimated_minutes: 12
+  - title: མིང་ཚིག་ཆར་པ། — གྲངས་ཀ།
+    description: རོལ་རྩེད་ནང་གྲངས་ཀ་ཏེབ།
+    type: game
+    estimated_minutes: 12
+  - title: མིང་ཚིག་ཆར་པ། — སེམས་ཅན།
+    description: རོལ་རྩེད་ནང་སེམས་ཅན་མིང་ཚིག་ཏེབ།
+    type: game
+    estimated_minutes: 12

@@ -11,16 +11,40 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from sqlalchemy.orm.attributes import flag_modified
+
 from app.agents.planner_agent import run_planner
 from app.core.security import get_current_user_id
 from app.database.session import get_db
-from app.models.entities import LearningPlan, Lesson, User
+from app.models.entities import LearningPlan, Lesson, Progress, User
 from app.models.schemas import (
     LearningPlanOut,
     LessonOut,
     LessonStatusUpdate,
     PlannerRequest,
 )
+
+MODULES_KEY = "modules"
+
+
+def _sync_modules_completed(progress: Progress | None, lesson_id: str) -> None:
+    """When a path lesson is marked done, also count it in interactive lesson progress."""
+    if not progress:
+        return
+    graph = dict(progress.learning_graph or {})
+    modules = dict(graph.get(MODULES_KEY) or {})
+    completed = list(modules.get("completed_lessons") or [])
+    if lesson_id in completed:
+        return
+    completed.append(lesson_id)
+    modules["completed_lessons"] = completed
+    modules.setdefault("mastered_letters", list(modules.get("mastered_letters") or []))
+    modules.setdefault("mastered_words", list(modules.get("mastered_words") or []))
+    modules.setdefault("xp", int(modules.get("xp") or 0))
+    modules.setdefault("interactive_lessons", dict(modules.get("interactive_lessons") or {}))
+    graph[MODULES_KEY] = modules
+    progress.learning_graph = graph
+    flag_modified(progress, "learning_graph")
 
 router = APIRouter(prefix="/planner", tags=["planner"])
 
@@ -63,6 +87,26 @@ async def get_roadmap(
     plan = result.scalar_one_or_none()
     if not plan:
         raise HTTPException(status_code=404, detail="No learning plan yet")
+
+    # Heal: interactive quiz completions should appear on the learning path
+    progress = await db.scalar(select(Progress).where(Progress.user_id == user_id))
+    if progress:
+        graph = dict(progress.learning_graph or {})
+        modules = dict(graph.get(MODULES_KEY) or {})
+        completed = set(modules.get("completed_lessons") or [])
+        healed = False
+        for lesson in plan.lessons:
+            lid = str(lesson.id)
+            if lid in completed and lesson.status != "completed":
+                lesson.status = "completed"
+                lesson.completed_at = lesson.completed_at or datetime.now(timezone.utc)
+                healed = True
+            elif lesson.status == "completed" and lid not in completed:
+                _sync_modules_completed(progress, lid)
+                healed = True
+        if healed:
+            await db.flush()
+
     return _plan_to_out(plan)
 
 
@@ -213,6 +257,12 @@ async def update_lesson_status(
             for l in week_lessons
         ):
             plan.current_week = max(plan.current_week, lesson.week_number + 1)
+        progress = await db.scalar(select(Progress).where(Progress.user_id == user_id))
+        if not progress:
+            progress = Progress(user_id=user_id, learning_graph={})
+            db.add(progress)
+            await db.flush()
+        _sync_modules_completed(progress, str(lesson.id))
     elif body.status == "in_progress":
         plan.current_week = max(plan.current_week, lesson.week_number)
 

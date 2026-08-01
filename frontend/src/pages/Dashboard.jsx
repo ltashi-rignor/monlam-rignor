@@ -113,7 +113,7 @@ export default function Dashboard() {
         </div>
         <div className="dash-hero-actions">
           {next ? (
-            <Link className="btn btn-primary" to="/learning-path">
+            <Link className="btn btn-primary" to={`/lessons/${next.id}`}>
               {bo.dashboard.continueLearning}
             </Link>
           ) : (
@@ -173,6 +173,9 @@ export default function Dashboard() {
               <div className="meta">
                 {lessonTypeBo(next.lesson_type)} · {statusBo(next.status)}
               </div>
+              <Link className="btn btn-primary" to={`/lessons/${next.id}`} style={{ marginTop: 10 }}>
+                {bo.learningPath.goToCourse}
+              </Link>
             </div>
           )}
 
@@ -180,12 +183,12 @@ export default function Dashboard() {
 
           <div className="dash-lesson-list">
             {weekLessons.map((lesson) => (
-              <article key={lesson.id} className="dash-lesson">
+              <Link key={lesson.id} to={`/lessons/${lesson.id}`} className="dash-lesson">
                 <div className="meta">
                   {lessonTypeBo(lesson.lesson_type)} · {statusBo(lesson.status)}
                 </div>
                 <strong>{tibetanOrFallback(lesson.title, lessonTypeBo(lesson.lesson_type))}</strong>
-              </article>
+              </Link>
             ))}
           </div>
 

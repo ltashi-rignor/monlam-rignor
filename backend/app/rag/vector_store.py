@@ -52,7 +52,15 @@ class VectorStore:
         top_k: int = 5,
         source_type: str | None = None,
     ) -> list[dict[str, Any]]:
-        vector = get_embeddings().embed_one(query)
+        from app.core.config import get_settings
+
+        embedder = get_embeddings()
+        settings = get_settings()
+        wait_s = float(settings.embedding_request_wait_s or 0.0)
+        vector = embedder.try_embed_one(query, wait_s=wait_s)
+        if vector is None:
+            # Model still warming — don’t block the whole request on BGE-M3.
+            return []
         # pgvector cosine distance
         vector_literal = "[" + ",".join(str(float(x)) for x in vector) + "]"
         sql = """

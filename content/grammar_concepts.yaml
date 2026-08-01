@@ -1,0 +1,166 @@
+concepts:
+- id: source_particles
+  keywords:
+  - source particle
+  - source of arising
+  - starting point
+  - origin
+  - from tibet
+  - 'nas '
+  - 'las '
+  prompt: དཔེ་དེབ་ལྟར། འབྱུང་ཁུངས་ཀྱི་ཕྲད་ཀྱི་དོན་གང་ཡིན།
+  sentence: ______ ནི་བྱ་བའི་འགོ་འཛུགས་སམ་འབྱུང་ཁུངས་སྟོན།
+  answer: ནས། / ལས།
+  options:
+  - ནས། / ལས།
+  - གིས། / གྱིས།
+  - དང་།
+  - ཀྱི། / གི།
+  explanation: འབྱུང་ཁུངས་ཀྱི་ཕྲད་ནི་བྱ་བའི་འགོ་འཛུགས་སམ་ཁུངས་སྟོན།
+  related_rule: ནས། ལས། — འབྱུང་ཁུངས།
+- id: agentive
+  keywords:
+  - agentive
+  - agent
+  - doer
+  - instrumental
+  - by the
+  prompt: དཔེ་དེབ་ལྟར། བྱེད་པ་པོའི་རྣམ་དབྱེ་གང་ཡིན།
+  sentence: དགེ་རྒན ______ དེབ་བཀླགས།
+  answer: གྱིས
+  options:
+  - གྱིས
+  - ལ
+  - ནས
+  - དང་
+  explanation: བྱེད་པ་པོ་སྟོན་པར་གིས། གྱིས། ཡིས། སོགས་སྤྱོད།
+  related_rule: བྱེད་པ་པོའི་རྣམ་དབྱེ།
+- id: genitive
+  keywords:
+  - genitive
+  - possessive
+  - connective
+  - of the
+  - belong
+  prompt: དཔེ་དེབ་ལྟར། འབྲེལ་སྒྲའི་དོན་གང་ཡིན།
+  sentence: བུ་མོ ______ དེབ་ཡིན།
+  answer: ཡི
+  options:
+  - ཡི
+  - ལ
+  - ནས
+  - གིས
+  explanation: འབྲེལ་བ་སྟོན་པར་གི། ཀྱི། གྱི། ཡི་སྤྱོད།
+  related_rule: འབྲེལ་སྒྲ།
+- id: locative
+  keywords:
+  - locative
+  - location
+  - destination
+  - place
+  - toward
+  - 'la '
+  prompt: དཔེ་དེབ་ལྟར། ཡུལ་གྱི་རྣམ་དབྱེ་གང་ཡིན།
+  sentence: ང་སློབ་གྲྭ ______ འགྲོ།
+  answer: ལ
+  options:
+  - ལ
+  - གིས
+  - ནས
+  - དང་
+  explanation: ཡུལ་སམ་ཕྱོགས་སྟོན་པར་ལ་སྤྱོད།
+  related_rule: ལ་— ཡུལ།
+- id: particles_postposition
+  keywords:
+  - postposition
+  - right after the words
+  - particles are always placed
+  - introduction to the particles
+  prompt: དཔེ་དེབ་ལྟར། བོད་ཡིག་གི་ཕྲད་ག་རེ་འཇོག
+  sentence: ཕྲད་ནི་ཚིག་གི ______ འཇོག
+  answer: རྗེས་སུ
+  options:
+  - རྗེས་སུ
+  - སྔོན་དུ
+  - དབུས་སུ
+  - སྟེང་དུ
+  explanation: བོད་ཡིག་གི་ཕྲད་ནི་ཚིག་གི་རྗེས་སུ་འཇོག (postposition)།
+  related_rule: ཕྲད་— ཚིག་རྗེས།
+- id: case_function
+  keywords:
+  - case particle
+  - functions of the different
+  - nominal groups
+  - lesson 5
+  prompt: དཔེ་དེབ་ལྟར། རྣམ་དབྱེའི་ཕྲད་ཀྱི་ལས་གང་ཡིན།
+  sentence: རྣམ་དབྱེའི་ཕྲད་ཀྱིས ______ སྟོན།
+  answer: ཚིག་གི་བྱེད་ལས
+  options:
+  - ཚིག་གི་བྱེད་ལས
+  - སྒྲ་གདངས་ཙམ
+  - ཡིག་གཟུགས་ཙམ
+  - དུས་ཚོད་ཙམ
+  explanation: རྣམ་དབྱེའི་ཕྲད་ཀྱིས་ཚིག་གི་བྱེད་ལས་སམ་འབྲེལ་བ་སྟོན།
+  related_rule: རྣམ་དབྱེའི་ཕྲད།
+- id: honorific_concept
+  keywords:
+  - honorific
+  - polite
+  - respect
+  - she sa
+  - zhé
+  prompt: དཔེ་དེབ་ལྟར། ཞེ་ས་གང་གི་ཆེད་དུ་སྤྱོད།
+  sentence: ཞེ་ས་ནི ______ ལ་ཞུ་བའི་ཚིག
+  answer: གུས་ཞབས
+  options:
+  - གུས་ཞབས
+  - ཁྲོ་བ
+  - རྩེད་མོ
+  - མགྱོགས་པ
+  explanation: ཞེ་ས་ནི་གུས་ཞབས་སྟོན་པའི་ཚིག་གི་ལུགས།
+  related_rule: ཞེ་ས།
+- id: verb_existence
+  keywords:
+  - verb
+  - yin
+  - yod
+  - existence
+  - copula
+  - tense
+  prompt: དཔེ་དེབ་ལྟར། ཡོད་པ་སྟོན་པར་གང་སྤྱོད།
+  sentence: ང་ལ་དེབ ______
+  answer: ཡོད།
+  options:
+  - ཡོད།
+  - ཡིན།
+  - བྱེད།
+  - འགྲོ།
+  explanation: ཡོད་པ་སྟོན་པར་ཡོད། ངོ་བོ་སྟོན་པར་ཡིན།
+  related_rule: ཡིན་དང་ཡོད།
+topic_priority:
+  particles:
+  - particles_postposition
+  - source_particles
+  - case_function
+  - connective
+  - locative
+  case:
+  - source_particles
+  - agentive
+  - genitive
+  - locative
+  - case_function
+  honorific:
+  - honorific_concept
+  - agentive
+  - particles_postposition
+  verbs:
+  - verb_existence
+  - agentive
+  - locative
+  mistakes:
+  - particles_postposition
+  - agentive
+  - genitive
+  - locative
+  - source_particles

@@ -13,6 +13,9 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.agents.interactive_lesson_agent import (
+    build_fallback_interactive_lesson,
+    is_melong_unavailable,
+    lesson_needs_refresh,
     normalize_interactive_lesson,
     run_interactive_lesson,
 )
@@ -134,6 +137,61 @@ def _week_meta(plan: LearningPlan, week_number: int) -> dict[str, Any]:
     return {"focus": "", "goals": []}
 
 
+def _mark_modules_lesson_done(modules: dict[str, Any], lesson_id: str) -> bool:
+    if lesson_id in modules["completed_lessons"]:
+        return False
+    modules["completed_lessons"].append(lesson_id)
+    return True
+
+
+async def _complete_planner_lesson(
+    db: AsyncSession, lesson: Lesson, plan: LearningPlan
+) -> None:
+    """Mark planner lesson completed and advance week when the week is done."""
+    from datetime import datetime, timezone
+
+    if lesson.status != "completed":
+        lesson.status = "completed"
+        lesson.completed_at = datetime.now(timezone.utc)
+
+    week_lessons = (
+        await db.execute(
+            select(Lesson).where(
+                Lesson.plan_id == plan.id,
+                Lesson.week_number == lesson.week_number,
+            )
+        )
+    ).scalars().all()
+    if week_lessons and all(l.status == "completed" for l in week_lessons):
+        plan.current_week = max(plan.current_week, lesson.week_number + 1)
+    else:
+        plan.current_week = max(plan.current_week, lesson.week_number)
+
+
+async def _heal_completed_lessons(
+    db: AsyncSession, user_id: UUID, progress: Progress, modules: dict[str, Any]
+) -> dict[str, Any]:
+    """Keep modules.completed_lessons and planner Lesson.status in sync."""
+    plan = await _active_plan(db, user_id)
+    if not plan:
+        return modules
+
+    changed = False
+    for lesson in plan.lessons:
+        lid = str(lesson.id)
+        if lesson.status == "completed":
+            if _mark_modules_lesson_done(modules, lid):
+                changed = True
+        elif lid in modules["completed_lessons"] and lesson.status != "completed":
+            await _complete_planner_lesson(db, lesson, plan)
+            changed = True
+
+    if changed:
+        _set_modules(progress, modules)
+        await db.flush()
+    return modules
+
+
 @router.get("/progress", response_model=ModuleProgressOut)
 async def get_module_progress(
     user_id: UUID = Depends(get_current_user_id),
@@ -141,6 +199,7 @@ async def get_module_progress(
 ):
     progress = await _ensure_progress(db, user_id)
     modules = _get_modules(progress)
+    modules = await _heal_completed_lessons(db, user_id, progress, modules)
     return ModuleProgressOut(
         mastered_letters=modules["mastered_letters"],
         mastered_words=modules["mastered_words"],
@@ -186,9 +245,20 @@ async def submit_module_quiz(
     modules = _get_modules(progress)
     xp_earned = max(0, body.score) * 10
     modules["xp"] = int(modules["xp"]) + xp_earned
-    if body.score >= max(1, body.total // 2):
-        if body.lesson_id not in modules["completed_lessons"]:
-            modules["completed_lessons"].append(body.lesson_id)
+    passed = body.score >= max(1, body.total // 2)
+    if passed:
+        _mark_modules_lesson_done(modules, body.lesson_id)
+        # Keep Learning Path status in sync with interactive lesson completion
+        try:
+            lesson_uuid = UUID(body.lesson_id)
+        except ValueError:
+            lesson_uuid = None
+        if lesson_uuid:
+            lesson = await db.get(Lesson, lesson_uuid)
+            if lesson:
+                plan = await db.get(LearningPlan, lesson.plan_id)
+                if plan and plan.user_id == user_id:
+                    await _complete_planner_lesson(db, lesson, plan)
     _set_modules(progress, modules)
     await db.flush()
     return QuizSubmitOut(
@@ -273,8 +343,15 @@ async def get_interactive_lesson(
         plan_cache = {}
 
     lid = str(lesson.id)
-    if not regenerate and isinstance(plan_cache.get(lid), dict):
-        return plan_cache[lid]
+    if lesson.status == "pending":
+        lesson.status = "in_progress"
+        plan.current_week = max(plan.current_week, lesson.week_number)
+
+    cached_body = plan_cache.get(lid) if isinstance(plan_cache.get(lid), dict) else None
+    # Skip stale/thin caches so learners get richer bank or Melong content.
+    if not regenerate and cached_body and not lesson_needs_refresh(cached_body):
+        await db.flush()
+        return cached_body
 
     user = await db.get(User, user_id)
     profile = {
@@ -291,13 +368,40 @@ async def get_interactive_lesson(
         "lesson_type": lesson.lesson_type,
         "week_number": lesson.week_number,
     }
-    raw = await run_interactive_lesson(profile, roadmap_lesson, week_meta)
+
+    # Prefer Melong; on rate-limit / outage, keep learning with offline lesson.
+    # If regenerate failed but a rich cached body exists, keep the cache.
+    try:
+        raw = await run_interactive_lesson(profile, roadmap_lesson, week_meta)
+    except Exception as exc:
+        if cached_body and not regenerate and not lesson_needs_refresh(cached_body):
+            await db.flush()
+            return cached_body
+        if cached_body and regenerate and is_melong_unavailable(exc) and not lesson_needs_refresh(cached_body):
+            await db.flush()
+            return cached_body
+        if is_melong_unavailable(exc):
+            raw = build_fallback_interactive_lesson(
+                lesson_id=lid,
+                week_number=lesson.week_number,
+                lesson_type=lesson.lesson_type,
+                fallback_title=lesson.title,
+                roadmap_lesson=roadmap_lesson,
+                week_meta=week_meta,
+                profile=profile,
+            )
+        else:
+            raise
+
     normalized = normalize_interactive_lesson(
         raw,
         lesson_id=lid,
         week_number=lesson.week_number,
         lesson_type=lesson.lesson_type,
         fallback_title=lesson.title,
+        roadmap_lesson=roadmap_lesson,
+        week_meta=week_meta,
+        profile=profile,
     )
 
     modules[INTERACTIVE_KEY] = {plan_key: {**plan_cache, lid: normalized}}

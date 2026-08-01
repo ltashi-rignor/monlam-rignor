@@ -1,14 +1,14 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { bo } from '../i18n/bo'
 import { mistakeTypeBo, tibetanOrFallback } from '../i18n/labels'
 
-function highlightText(text, mistakes) {
+function highlightText(text, mistakes, onTapSpan) {
   if (!text) return null
   const spans = (mistakes || [])
-    .map((m) => m.original)
-    .filter((o) => o && text.includes(o))
-    .sort((a, b) => b.length - a.length)
+    .map((m, i) => ({ original: m.original, index: i }))
+    .filter((o) => o.original && text.includes(o.original))
+    .sort((a, b) => b.original.length - a.original.length)
 
   if (!spans.length) {
     return <span className="annotate-plain">{text}</span>
@@ -21,7 +21,7 @@ function highlightText(text, mistakes) {
     let earliest = -1
     let match = null
     for (const span of spans) {
-      const idx = remaining.indexOf(span)
+      const idx = remaining.indexOf(span.original)
       if (idx !== -1 && (earliest === -1 || idx < earliest)) {
         earliest = idx
         match = span
@@ -43,23 +43,31 @@ function highlightText(text, mistakes) {
       )
     }
     parts.push(
-      <mark key={key++} className="annotate-err">
-        {match}
-      </mark>,
+      <button
+        key={key++}
+        type="button"
+        className="annotate-err annotate-err-btn"
+        onClick={() => onTapSpan?.(match.index, match.original)}
+      >
+        {match.original}
+      </button>,
     )
-    remaining = remaining.slice(earliest + match.length)
+    remaining = remaining.slice(earliest + match.original.length)
   }
   return parts
 }
 
-function MistakeCard({ mistake, kind }) {
+function MistakeCard({ mistake, kind, id, active }) {
   const type = mistakeTypeBo(mistake.mistake_type)
   const explanation = tibetanOrFallback(mistake.explanation, '')
   const rule = tibetanOrFallback(mistake.related_rule, '')
   const source = tibetanOrFallback(mistake.source_ref, '')
 
   return (
-    <article className={`mistake-card kind-${kind}`}>
+    <article
+      id={id}
+      className={`mistake-card kind-${kind} ${active ? 'is-active' : ''}`}
+    >
       <div className="mistake-card-top">
         <span className={`mistake-badge kind-${kind}`}>{type}</span>
       </div>
@@ -117,6 +125,23 @@ export default function GrammarResult({ result, originalText, onApplyCorrection 
     .filter(Boolean)
   const questions = result?.practice_questions || []
   const sources = result?.retrieved_sources || []
+  const [activeId, setActiveId] = useState(null)
+  const listRef = useRef(null)
+
+  function focusMistake(index, original) {
+    // Prefer exact original match among combined list
+    let target = index
+    const byText = all.findIndex((m) => m.original === original)
+    if (byText >= 0) target = byText
+    const id = `mistake-card-${target}`
+    setActiveId(id)
+    const el = document.getElementById(id)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    } else {
+      listRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
+  }
 
   if (!result) {
     return (
@@ -148,7 +173,8 @@ export default function GrammarResult({ result, originalText, onApplyCorrection 
       {originalText && (
         <section className="grammar-section">
           <h4>{bo.grammar.annotated}</h4>
-          <div className="annotate-box">{highlightText(originalText, all)}</div>
+          <p className="muted annotate-hint">{bo.grammar.tapMistake}</p>
+          <div className="annotate-box">{highlightText(originalText, all, focusMistake)}</div>
         </section>
       )}
 
@@ -164,25 +190,42 @@ export default function GrammarResult({ result, originalText, onApplyCorrection 
         <p className="corrected-text">{result.corrected_version}</p>
       </section>
 
-      <section className="grammar-section">
-        <h4>{bo.grammar.mistakes}</h4>
-        {!mistakes.length && <p className="empty">{bo.grammar.noGeneralMistakes}</p>}
-        <div className="mistake-list">
-          {mistakes.map((m, i) => (
-            <MistakeCard key={`g-${i}`} mistake={m} kind="grammar" />
-          ))}
-        </div>
-      </section>
+      <div ref={listRef}>
+        <section className="grammar-section">
+          <h4>{bo.grammar.mistakes}</h4>
+          {!mistakes.length && <p className="empty">{bo.grammar.noGeneralMistakes}</p>}
+          <div className="mistake-list">
+            {mistakes.map((m, i) => (
+              <MistakeCard
+                key={`g-${i}`}
+                id={`mistake-card-${i}`}
+                mistake={m}
+                kind="grammar"
+                active={activeId === `mistake-card-${i}`}
+              />
+            ))}
+          </div>
+        </section>
 
-      <section className="grammar-section">
-        <h4>{bo.grammar.honorifics}</h4>
-        {!honorifics.length && <p className="empty">{bo.grammar.noHonorifics}</p>}
-        <div className="mistake-list">
-          {honorifics.map((m, i) => (
-            <MistakeCard key={`h-${i}`} mistake={m} kind="honorific" />
-          ))}
-        </div>
-      </section>
+        <section className="grammar-section">
+          <h4>{bo.grammar.honorifics}</h4>
+          {!honorifics.length && <p className="empty">{bo.grammar.noHonorifics}</p>}
+          <div className="mistake-list">
+            {honorifics.map((m, i) => {
+              const cardId = `mistake-card-${mistakes.length + i}`
+              return (
+                <MistakeCard
+                  key={`h-${i}`}
+                  id={cardId}
+                  mistake={m}
+                  kind="honorific"
+                  active={activeId === cardId}
+                />
+              )
+            })}
+          </div>
+        </section>
+      </div>
 
       {!!rules.length && (
         <section className="grammar-section">

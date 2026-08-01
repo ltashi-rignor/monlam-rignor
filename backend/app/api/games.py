@@ -7,121 +7,47 @@ import re
 from typing import Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.core.security import get_current_user_id
-from app.services.llm import get_llm
+from app.content.loader import load_yaml
+from app.services.llm import get_llm, melong_is_rate_limited
 
 router = APIRouter(prefix="/games", tags=["games"])
 
-THEMES = {
-    "all": "everyday beginner Tibetan for kids (mixed topics: animals, family, nature, food, school, body, colors, weather)",
-    "animals": "many different animals kids know (pets, farm, wild, birds, insects)",
-    "family": "family and people (parents, siblings, grandparents, friends, teacher)",
-    "nature": "nature and outdoors (sky, earth, water, plants, weather, places)",
-    "food": "food and drink kids eat",
-    "greetings": "greetings, polite words, and simple classroom phrases",
-    "numbers": "numbers and counting words (one through twenty, plus simple quantity words)",
-}
 
-# Broader fallback if Melong is down — still theme-diverse.
-_FALLBACK: dict[str, list[dict[str, str]]] = {
-    "animals": [
-        {"tibetan": "ཁྱི", "english": "dog", "wylie": "khyi"},
-        {"tibetan": "ཞི་མི", "english": "cat", "wylie": "zhi mi"},
-        {"tibetan": "རྟ", "english": "horse", "wylie": "rta"},
-        {"tibetan": "གཡག", "english": "yak", "wylie": "g.yag"},
-        {"tibetan": "བྱ", "english": "bird", "wylie": "bya"},
-        {"tibetan": "ཉ", "english": "fish", "wylie": "nya"},
-        {"tibetan": "ཕག་པ", "english": "pig", "wylie": "phag pa"},
-        {"tibetan": "ར་མ", "english": "goat", "wylie": "ra ma"},
-        {"tibetan": "ལུག", "english": "sheep", "wylie": "lug"},
-        {"tibetan": "གླང་ཆེན", "english": "elephant", "wylie": "glang chen"},
-        {"tibetan": "སེང་གེ", "english": "lion", "wylie": "seng ge"},
-        {"tibetan": "སྟག", "english": "tiger", "wylie": "stag"},
-        {"tibetan": "དོམ", "english": "bear", "wylie": "dom"},
-        {"tibetan": "ཝ་མོ", "english": "fox", "wylie": "wa mo"},
-        {"tibetan": "བྱི་ལ་", "english": "mouse", "wylie": "byi la"},
-        {"tibetan": "སྦལ་པ", "english": "frog", "wylie": "sbal pa"},
-        {"tibetan": "སྦྲང་མ", "english": "bee", "wylie": "sbrang ma"},
-        {"tibetan": "འབུ་སྲིན", "english": "insect", "wylie": "'bu srin"},
-        {"tibetan": "བྱ་གག", "english": "chicken", "wylie": "bya gag"},
-        {"tibetan": "ངང་པ", "english": "duck", "wylie": "ngang pa"},
-    ],
-    "family": [
-        {"tibetan": "ཨ་མ", "english": "mother", "wylie": "a ma"},
-        {"tibetan": "ཨ་པ", "english": "father", "wylie": "a pa"},
-        {"tibetan": "བུ", "english": "son", "wylie": "bu"},
-        {"tibetan": "བུ་མོ", "english": "girl", "wylie": "bu mo"},
-        {"tibetan": "སྤུན", "english": "sibling", "wylie": "spun"},
-        {"tibetan": "མེས་པོ", "english": "grandfather", "wylie": "mes po"},
-        {"tibetan": "རྨོ་མོ", "english": "grandmother", "wylie": "rmo mo"},
-        {"tibetan": "གྲོགས་པོ", "english": "friend", "wylie": "grogs po"},
-        {"tibetan": "དགེ་རྒན", "english": "teacher", "wylie": "dge rgan"},
-        {"tibetan": "སློབ་ཕྲུག", "english": "student", "wylie": "slob phrug"},
-        {"tibetan": "མི", "english": "person", "wylie": "mi"},
-        {"tibetan": "བྱིས་པ", "english": "child", "wylie": "byis pa"},
-    ],
-    "nature": [
-        {"tibetan": "ཆུ", "english": "water", "wylie": "chu"},
-        {"tibetan": "རི", "english": "mountain", "wylie": "ri"},
-        {"tibetan": "ཉི་མ", "english": "sun", "wylie": "nyi ma"},
-        {"tibetan": "ཟླ་བ", "english": "moon", "wylie": "zla ba"},
-        {"tibetan": "མེ་ཏོག", "english": "flower", "wylie": "me tog"},
-        {"tibetan": "སྐར་མ", "english": "star", "wylie": "skar ma"},
-        {"tibetan": "མེ", "english": "fire", "wylie": "me"},
-        {"tibetan": "རླུང", "english": "wind", "wylie": "rlung"},
-        {"tibetan": "ཆར་པ", "english": "rain", "wylie": "char pa"},
-        {"tibetan": "གངས", "english": "snow", "wylie": "gangs"},
-        {"tibetan": "ཤིང", "english": "tree", "wylie": "shing"},
-        {"tibetan": "ནགས", "english": "forest", "wylie": "nags"},
-        {"tibetan": "མཚོ", "english": "lake", "wylie": "mtsho"},
-        {"tibetan": "གནམ", "english": "sky", "wylie": "gnam"},
-        {"tibetan": "ས་ཆ", "english": "land", "wylie": "sa cha"},
-        {"tibetan": "རྡོ", "english": "stone", "wylie": "rdo"},
-    ],
-    "food": [
-        {"tibetan": "ཇ", "english": "tea", "wylie": "ja"},
-        {"tibetan": "འོ་མ", "english": "milk", "wylie": "'o ma"},
-        {"tibetan": "འབྲས", "english": "rice", "wylie": "'bras"},
-        {"tibetan": "ཤ", "english": "meat", "wylie": "sha"},
-        {"tibetan": "བག་ལེབ", "english": "bread", "wylie": "bag leb"},
-        {"tibetan": "ཤིང་ཏོག", "english": "fruit", "wylie": "shing tog"},
-        {"tibetan": "སྔོ་ཚལ", "english": "vegetable", "wylie": "sngo tshal"},
-        {"tibetan": "ཆུ", "english": "water", "wylie": "chu"},
-        {"tibetan": "མར", "english": "butter", "wylie": "mar"},
-        {"tibetan": "ཞོ", "english": "yogurt", "wylie": "zho"},
-        {"tibetan": "སྐྱུར་རྩི", "english": "candy", "wylie": "skyur rtsi"},
-        {"tibetan": "ཁུ་བ", "english": "soup", "wylie": "khu ba"},
-    ],
-    "greetings": [
-        {"tibetan": "བཀྲ་ཤིས་བདེ་ལེགས།", "english": "hello", "wylie": "bkra shis bde legs"},
-        {"tibetan": "ཐུགས་རྗེ་ཆེ།", "english": "thank you", "wylie": "thugs rje che"},
-        {"tibetan": "དགོངས་དག", "english": "sorry", "wylie": "dgongs dag"},
-        {"tibetan": "ལགས་སོ།", "english": "yes", "wylie": "lags so"},
-        {"tibetan": "ག་རེ་འདུག", "english": "how are you", "wylie": "ga re 'dug"},
-        {"tibetan": "བདེ་མོ།", "english": "goodbye", "wylie": "bde mo"},
-        {"tibetan": "ཞུ་དགོས།", "english": "please", "wylie": "zhu dgos"},
-    ],
-    "numbers": [
-        {"tibetan": "གཅིག", "english": "one", "wylie": "gcig"},
-        {"tibetan": "གཉིས", "english": "two", "wylie": "gnyis"},
-        {"tibetan": "གསུམ", "english": "three", "wylie": "gsum"},
-        {"tibetan": "བཞི", "english": "four", "wylie": "bzhi"},
-        {"tibetan": "ལྔ", "english": "five", "wylie": "lnga"},
-        {"tibetan": "དྲུག", "english": "six", "wylie": "drug"},
-        {"tibetan": "བདུན", "english": "seven", "wylie": "bdun"},
-        {"tibetan": "བརྒྱད", "english": "eight", "wylie": "brgyad"},
-        {"tibetan": "དགུ", "english": "nine", "wylie": "dgu"},
-        {"tibetan": "བཅུ", "english": "ten", "wylie": "bcu"},
-        {"tibetan": "བཅུ་གཅིག", "english": "eleven", "wylie": "bcu gcig"},
-        {"tibetan": "བཅུ་གཉིས", "english": "twelve", "wylie": "bcu gnyis"},
-        {"tibetan": "ཉི་ཤུ", "english": "twenty", "wylie": "nyi shu"},
-        {"tibetan": "མང་པོ", "english": "many", "wylie": "mang po"},
-        {"tibetan": "ཉུང་ཉུང", "english": "few", "wylie": "nyung nyung"},
-    ],
-}
+def _vocab_data() -> dict[str, Any]:
+    return load_yaml("vocab_rain")
+
+
+def get_theme_prompts() -> dict[str, str]:
+    raw = _vocab_data().get("theme_prompts") or {}
+    return {str(k): str(v) for k, v in raw.items()} if isinstance(raw, dict) else {}
+
+
+def get_fallback_packs() -> dict[str, list[dict[str, str]]]:
+    raw = _vocab_data().get("packs") or {}
+    out: dict[str, list[dict[str, str]]] = {}
+    if isinstance(raw, dict):
+        for theme, words in raw.items():
+            if not isinstance(words, list):
+                continue
+            out[str(theme)] = [
+                {
+                    "tibetan": str(w.get("tibetan") or ""),
+                    "english": str(w.get("english") or ""),
+                    "wylie": str(w.get("wylie") or ""),
+                }
+                for w in words
+                if isinstance(w, dict) and w.get("tibetan")
+            ]
+    return out
+
+
+# Back-compat names used inside this module
+THEMES = get_theme_prompts()
+_FALLBACK = get_fallback_packs()
 
 
 class VocabRainIn(BaseModel):
@@ -273,6 +199,11 @@ def _fallback_words(theme: str, count: int, exclude: set[str] | None = None) -> 
 
 
 def _ask_melong(theme: str, topic: str, level: str, count: int, exclude: list[str]) -> list[VocabWordOut]:
+    if melong_is_rate_limited():
+        raise HTTPException(
+            status_code=502,
+            detail="Monlam Melong error (429): Organization rate limit exceeded",
+        )
     system = (
         "You generate Tibetan vocabulary for a children's typing game. "
         "Return JSON only with key 'words': an array of objects. "
@@ -294,7 +225,7 @@ def _ask_melong(theme: str, topic: str, level: str, count: int, exclude: list[st
         '{"tibetan":"ཆུ","english":"water","wylie":"chu","answers":["water"]}'
     )
     llm = get_llm()
-    data = llm.complete_json(system, user, max_tokens=4096, temperature=0.85, retries=1)
+    data = llm.complete_json(system, user, max_tokens=4096, temperature=0.85, retries=0)
     return _normalize_words(data, theme, count, exclude=set(exclude))
 
 
@@ -315,31 +246,31 @@ def generate_vocab_rain(
 
     words: list[VocabWordOut] = []
     source: Literal["ai", "fallback"] = "fallback"
-    try:
-        # First batch
-        batch = _ask_melong(theme, topic, level, want, exclude)
-        words.extend(batch)
-        source = "ai"
-        # If Melong returned a thin list, ask once more for fresh words
-        if len(words) < max(12, want // 2):
-            more_exclude = exclude + [w.tibetan for w in words]
-            extra = _ask_melong(theme, topic, level, want, more_exclude)
-            seen = {w.tibetan for w in words}
-            for w in extra:
-                if w.tibetan in seen:
-                    continue
-                words.append(w)
-                seen.add(w.tibetan)
-                if len(words) >= want:
-                    break
-    except Exception:
-        words = []
+
+    # When Melong is known-down, skip the wait and serve offline packs immediately.
+    if not melong_is_rate_limited():
+        try:
+            batch = _ask_melong(theme, topic, level, want, exclude)
+            words.extend(batch)
+            source = "ai"
+            if len(words) < max(12, want // 2):
+                more_exclude = exclude + [w.tibetan for w in words]
+                extra = _ask_melong(theme, topic, level, want, more_exclude)
+                seen = {w.tibetan for w in words}
+                for w in extra:
+                    if w.tibetan in seen:
+                        continue
+                    words.append(w)
+                    seen.add(w.tibetan)
+                    if len(words) >= want:
+                        break
+        except Exception:
+            words = []
 
     if len(words) < 8:
         words = _fallback_words(theme, want, exclude=set(exclude))
         source = "fallback"
     elif len(words) < want:
-        # Top up with fallback uniques so the pack feels full
         have = {w.tibetan for w in words} | set(exclude)
         for w in _fallback_words(theme, want, exclude=have):
             if w.tibetan in have:

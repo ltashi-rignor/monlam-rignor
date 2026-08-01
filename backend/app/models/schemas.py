@@ -105,6 +105,34 @@ class GrammarCheckResponse(BaseModel):
     praise: str | None = None
 
 
+class GrammarGameRequest(BaseModel):
+    topic: str = Field(default="particles", min_length=1, max_length=80)
+
+
+class GrammarGameRound(BaseModel):
+    id: str
+    type: str
+    prompt: str
+    sentence: str
+    error_span: str = ""
+    options: list[str] = []
+    answer: str = ""
+    explanation: str = ""
+    related_rule: str = ""
+    source_ref: str = ""
+    handbook_excerpt: str = ""
+    page_number: int | None = None
+
+
+class GrammarGameResponse(BaseModel):
+    topic: str
+    topic_label: str = ""
+    rounds: list[GrammarGameRound]
+    retrieved_sources: list[dict[str, Any]] = []
+    offline: bool = False
+    source: str = "melong"
+
+
 class RecentMistakeOut(BaseModel):
     id: UUID
     mistake_type: str

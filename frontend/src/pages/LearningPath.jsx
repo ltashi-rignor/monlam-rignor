@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import LessonDetail from '../components/LessonDetail'
 import PathGraph from '../components/PathGraph'
 import Roadmap from '../components/Roadmap'
+import { lessonDestination, isActivityLesson, lessonTypeGlyph } from '../lib/lessonNav'
 import { bo } from '../i18n/bo'
-import { statusBo, tibetanOrFallback } from '../i18n/labels'
+import { lessonTypeBo, statusBo, tibetanOrFallback } from '../i18n/labels'
 
 function buildWeeks(plan) {
   if (!plan) return []
@@ -28,6 +30,7 @@ function buildWeeks(plan) {
       }
       byWeek.get(wn).lessons.push({
         ...lesson,
+        id: lesson.id != null ? String(lesson.id) : null,
         description: lesson.content,
       })
     }
@@ -53,45 +56,120 @@ function buildWeeks(plan) {
 }
 
 export default function LearningPath() {
+  const navigate = useNavigate()
   const [plan, setPlan] = useState(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [detailBusy, setDetailBusy] = useState(false)
   const [selected, setSelected] = useState(null)
+  const [noPlan, setNoPlan] = useState(false)
 
   const weeks = useMemo(() => buildWeeks(plan), [plan])
 
+  const allLessons = useMemo(() => weeks.flatMap((w) => w.lessons), [weeks])
+
   const stats = useMemo(() => {
-    const all = weeks.flatMap((w) => w.lessons)
-    const completed = all.filter((l) => l.status === 'completed').length
+    const completed = allLessons.filter((l) => l.status === 'completed').length
+    const inProgress = allLessons.filter((l) => l.status === 'in_progress').length
+    const total = allLessons.length
+    // Count started lessons so the bar moves before "mark done"
+    const weighted = completed + inProgress * 0.5
     return {
-      total: all.length,
+      total,
       completed,
-      pct: all.length ? Math.round((completed / all.length) * 100) : 0,
+      inProgress,
+      pct: total ? Math.round((weighted / total) * 100) : 0,
     }
-  }, [weeks])
+  }, [allLessons])
+
+  const continueLesson = useMemo(() => {
+    return (
+      allLessons.find((l) => l.status === 'in_progress') ||
+      allLessons.find((l) => l.status !== 'completed' && lessonDestination(l)) ||
+      null
+    )
+  }, [allLessons])
 
   async function load() {
     try {
       const data = await api.getRoadmap()
       setPlan(data)
+      setNoPlan(false)
       setError('')
+      return data
     } catch (err) {
-      setError(err.message)
+      const missing = /no learning plan/i.test(err.message || '')
+      setNoPlan(missing)
+      setPlan(null)
+      setError(missing ? '' : err.message)
+      return null
     }
   }
 
   useEffect(() => {
-    load()
+    let cancelled = false
+    ;(async () => {
+      const data = await load()
+      if (cancelled || !data) return
+      const lessons = [...(data.lessons || [])].map((l) => ({
+        ...l,
+        id: l.id != null ? String(l.id) : null,
+      }))
+
+      // Heal: activity modules left as in_progress should count as completed
+      const stuck = lessons.filter(
+        (l) => l.id && l.status === 'in_progress' && isActivityLesson(l),
+      )
+      for (const lesson of stuck) {
+        try {
+          await api.updateLessonStatus(String(lesson.id), 'completed')
+        } catch {
+          /* ignore */
+        }
+      }
+      if (stuck.length) {
+        const refreshed = await load()
+        if (cancelled || !refreshed) return
+        lessons.splice(
+          0,
+          lessons.length,
+          ...(refreshed.lessons || []).map((l) => ({
+            ...l,
+            id: l.id != null ? String(l.id) : null,
+          })),
+        )
+      }
+
+      const resume =
+        lessons.find((l) => l.status === 'in_progress') ||
+        lessons.find((l) => l.status !== 'completed')
+      if (resume?.id) {
+        try {
+          const detail = await api.getLesson(resume.id)
+          if (!cancelled) {
+            setSelected({
+              ...detail,
+              id: detail.id != null ? String(detail.id) : resume.id,
+            })
+          }
+        } catch {
+          if (!cancelled) setSelected(resume)
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
-  async function regenerate() {
+  async function regenerate(force = true) {
     setBusy(true)
     setError('')
     setSelected(null)
     try {
-      const data = await api.generateRoadmap(true)
+      const data = await api.generateRoadmap(force)
       setPlan(data)
+      setNoPlan(false)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -100,21 +178,28 @@ export default function LearningPath() {
   }
 
   async function selectLesson(lesson) {
-    if (!lesson?.id) {
+    if (!lesson) return
+    const weekMeta = weeks.find((w) => w.week_number === lesson.week_number)
+    if (!lesson.id) {
       setSelected({
         ...lesson,
-        week_focus: weeks.find((w) => w.week_number === lesson.week_number)?.focus,
-        goals: weeks.find((w) => w.week_number === lesson.week_number)?.goals || [],
+        week_focus: weekMeta?.focus,
+        goals: weekMeta?.goals || [],
       })
       return
     }
+    const lid = String(lesson.id)
     setDetailBusy(true)
     setError('')
+    // Show roadmap card immediately so UI never feels stuck
+    setSelected({ ...lesson, id: lid, week_focus: weekMeta?.focus, goals: weekMeta?.goals || [] })
     try {
-      const detail = await api.getLesson(lesson.id)
-      setSelected(detail)
+      const detail = await api.getLesson(lid)
+      setSelected({
+        ...detail,
+        id: detail.id != null ? String(detail.id) : lid,
+      })
     } catch (err) {
-      setSelected(lesson)
       setError(err.message)
     } finally {
       setDetailBusy(false)
@@ -126,8 +211,11 @@ export default function LearningPath() {
     setDetailBusy(true)
     setError('')
     try {
-      const updated = await api.updateLessonStatus(selected.id, status)
-      setSelected(updated)
+      const updated = await api.updateLessonStatus(String(selected.id), status)
+      setSelected({
+        ...updated,
+        id: updated.id != null ? String(updated.id) : String(selected.id),
+      })
       const data = await api.getRoadmap()
       setPlan(data)
     } catch (err) {
@@ -137,6 +225,61 @@ export default function LearningPath() {
     }
   }
 
+  function markOpened(lesson) {
+    if (!lesson?.id) return
+    // Practice modules have no quiz gate — opening counts as done.
+    // Interactive lessons stay in_progress until quiz / mark done.
+    const nextStatus = isActivityLesson(lesson)
+      ? 'completed'
+      : lesson.status === 'pending'
+        ? 'in_progress'
+        : null
+    if (!nextStatus || lesson.status === nextStatus) return
+    api
+      .updateLessonStatus(String(lesson.id), nextStatus)
+      .then(() => api.getRoadmap())
+      .then((data) => {
+        setPlan(data)
+        if (selected && String(selected.id) === String(lesson.id)) {
+          setSelected((prev) => (prev ? { ...prev, status: nextStatus } : prev))
+        }
+      })
+      .catch(() => {})
+  }
+
+  function openLesson(lesson) {
+    const target = lesson || selected
+    if (!target) return
+    const href = lessonDestination(target)
+    if (!href) {
+      setError(bo.learningPath.needRegen)
+      selectLesson(target)
+      return
+    }
+    markOpened(target)
+    navigate(href)
+  }
+
+  if (noPlan && !plan) {
+    return (
+      <div className="tibetan learning-path-page">
+        <header className="page-header">
+          <div>
+            <h1>{bo.learningPath.title}</h1>
+            <p>{bo.learningPath.sub}</p>
+          </div>
+        </header>
+        {error && <p className="error">{error}</p>}
+        <div className="panel empty">
+          <p>{bo.learningPath.noPlan}</p>
+          <button className="btn btn-primary" onClick={() => regenerate(false)} disabled={busy}>
+            {busy ? bo.learningPath.creating : bo.learningPath.createFirst}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="tibetan learning-path-page">
       <header className="page-header">
@@ -144,15 +287,26 @@ export default function LearningPath() {
           <h1>{bo.learningPath.title}</h1>
           <p>{bo.learningPath.sub}</p>
         </div>
-        <button className="btn btn-primary" onClick={regenerate} disabled={busy}>
-          {busy ? bo.learningPath.regenerating : bo.learningPath.regenerate}
-        </button>
+        <div className="path-header-actions">
+          {continueLesson && (
+            <button
+              type="button"
+              className="btn btn-accent"
+              onClick={() => openLesson(continueLesson)}
+            >
+              {bo.modules.continue}
+            </button>
+          )}
+          <button className="btn btn-primary" onClick={() => regenerate(true)} disabled={busy}>
+            {busy ? bo.learningPath.regenerating : bo.learningPath.regenerate}
+          </button>
+        </div>
       </header>
 
       {error && <p className="error">{error}</p>}
 
       {plan && (
-        <div className="path-overview panel">
+        <div className="path-overview panel path-hero-stage">
           <div>
             <h2 style={{ margin: '0 0 6px' }}>
               {tibetanOrFallback(plan.title, bo.learningPath.title)}
@@ -178,10 +332,44 @@ export default function LearningPath() {
                 {stats.completed}/{stats.total} · {stats.pct}%
               </strong>
             </div>
+            {stats.inProgress > 0 && (
+              <div className="stat-chip">
+                <span>{statusBo('in_progress')}</span>
+                <strong dir="ltr">{stats.inProgress}</strong>
+              </div>
+            )}
           </div>
           <div className="overview-progress" aria-hidden>
             <div className="overview-progress-fill" style={{ width: `${stats.pct}%` }} />
           </div>
+          {continueLesson && (
+            <div className="path-now-playing">
+              <div className="path-now-playing-glow" aria-hidden />
+              <span className="path-type-glyph lg" aria-hidden>
+                {lessonTypeGlyph(continueLesson.lesson_type)}
+              </span>
+              <div className="path-now-playing-body">
+                <p className="path-now-label">
+                  <span className="path-live-dot" aria-hidden />
+                  {bo.learningPath.nowPlaying}
+                </p>
+                <h3>{tibetanOrFallback(continueLesson.title, bo.common.lesson)}</h3>
+                <p className="meta">
+                  {lessonTypeBo(continueLesson.lesson_type)} · {statusBo(continueLesson.status)}
+                  {continueLesson.estimated_minutes != null
+                    ? ` · ~${continueLesson.estimated_minutes} ${bo.learningPath.minutes}`
+                    : ''}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn btn-primary path-cta-pulse"
+                onClick={() => openLesson(continueLesson)}
+              >
+                {bo.learningPath.goToCourse}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -190,16 +378,22 @@ export default function LearningPath() {
         currentWeek={plan?.current_week || 1}
         selectedId={selected?.id}
         onSelectLesson={selectLesson}
+        onOpenLesson={openLesson}
       />
 
       <div className={`path-split ${selected ? 'has-detail' : ''}`}>
-        <Roadmap weeks={weeks} selectedId={selected?.id} onSelectLesson={selectLesson} />
+        <Roadmap
+          weeks={weeks}
+          selectedId={selected?.id}
+          onSelectLesson={selectLesson}
+          onOpenLesson={openLesson}
+        />
         {selected && (
           <LessonDetail
             lesson={selected}
             busy={detailBusy}
             onClose={() => setSelected(null)}
-            onStart={() => patchStatus('in_progress')}
+            onOpenCourse={() => markOpened(selected)}
             onComplete={() => patchStatus('completed')}
           />
         )}

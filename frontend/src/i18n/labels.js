@@ -10,6 +10,9 @@ const LESSON_TYPES = {
   practice: 'སྦྱོང་བརྡར།',
   quiz: 'དྲི་བ།',
   lesson: 'སློབ་ཚན།',
+  game: 'རོལ་རྩེད།',
+  handwriting: 'ཡིག་གཟུགས།',
+  flashcards: 'ཤོག་བུ།',
 }
 
 const STATUSES = {

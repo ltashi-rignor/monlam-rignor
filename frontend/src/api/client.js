@@ -114,13 +114,15 @@ export const api = {
   verifyOtp: (email, code) => request('/api/auth/verify-otp', { method: 'POST', body: { email, code } }),
   me: () => request('/api/auth/me', { ttl: 60_000 }),
   updateProfile: (body) => request('/api/auth/me', { method: 'PUT', body }),
-  getRoadmap: () => request('/api/planner/roadmap', { ttl: 20_000 }),
+  getRoadmap: () => request('/api/planner/roadmap', { ttl: 0 }),
   generateRoadmap: (regenerate = false) =>
     request('/api/planner/generate', { method: 'POST', body: { regenerate } }),
   getLesson: (id) => request(`/api/planner/lessons/${id}`, { ttl: 30_000 }),
   updateLessonStatus: (id, status) =>
     request(`/api/planner/lessons/${id}/status`, { method: 'POST', body: { status } }),
   checkGrammar: (text) => request('/api/grammar/check', { method: 'POST', body: { text } }),
+  generateGrammarGame: (topic = 'particles') =>
+    request('/api/grammar/game', { method: 'POST', body: { topic }, ttl: 0 }),
   recentGrammarMistakes: (limit = 8) =>
     request(`/api/grammar/recent-mistakes?limit=${limit}`, { ttl: 20_000 }),
   submitEssay: (body) => request('/api/essay/submit', { method: 'POST', body }),
@@ -143,14 +145,39 @@ export const api = {
   getInteractiveLesson: (id, regenerate = false) =>
     request(
       `/api/modules/lessons/${id}${regenerate ? '?regenerate=true' : ''}`,
-      { ttl: regenerate ? 0 : 60_000 },
+      { ttl: 0 },
     ),
   regenerateInteractiveLesson: (id) =>
     request(`/api/modules/lessons/${id}/regenerate`, { method: 'POST' }),
-  tutorChat: (messages) =>
-    request('/api/tutor/chat', { method: 'POST', body: { messages } }),
+  tutorChat: (messages, mode = 'text') =>
+    request('/api/tutor/chat', { method: 'POST', body: { messages, mode } }),
   tutorTts: (text, voice_name = 'lhasa_female') =>
     request('/api/tutor/tts', { method: 'POST', body: { text, voice_name }, ttl: 0 }),
+  tutorStt: async (blob, filename = 'speech.webm') => {
+    const token = getToken()
+    const form = new FormData()
+    form.append('file', blob, filename)
+    form.append('language', 'bo')
+    form.append('task', 'transcribe')
+    const res = await fetch(`${API_URL}/api/tutor/stt`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    })
+    if (res.status === 401) {
+      setToken(null)
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login'
+      }
+    }
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      const detail = data.detail
+      const message = typeof detail === 'string' ? detail : detail?.[0]?.msg || 'Request failed'
+      throw new Error(message)
+    }
+    return data
+  },
   generateVocabRain: (theme = 'animals', count = 28, difficulty = 'easy', exclude = []) =>
     request('/api/games/vocab-rain', {
       method: 'POST',

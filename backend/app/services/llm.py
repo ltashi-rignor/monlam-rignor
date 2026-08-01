@@ -61,6 +61,8 @@ class LLMService:
             )
         if response.status_code >= 400:
             detail = response.text[:500]
+            if response.status_code == 429 or "rate limit" in detail.lower():
+                note_melong_rate_limit()
             raise HTTPException(
                 status_code=502,
                 detail=f"Monlam Melong error ({response.status_code}): {detail}",
@@ -103,6 +105,8 @@ class LLMService:
 
         if response.status_code >= 400:
             detail = response.text[:500]
+            if response.status_code == 429 or "rate limit" in detail.lower():
+                note_melong_rate_limit()
             raise HTTPException(
                 status_code=502,
                 detail=f"Monlam Melong error ({response.status_code}): {detail}",
@@ -247,6 +251,21 @@ def _repair_truncated_json(text: str) -> dict[str, Any] | None:
 
 _llm: LLMService | None = None
 _llm_key: str | None = None
+_rate_limited_until: float = 0.0
+
+
+def note_melong_rate_limit(seconds: float = 6 * 3600.0) -> None:
+    """Skip Melong calls for a while after a daily quota error."""
+    import time
+
+    global _rate_limited_until
+    _rate_limited_until = max(_rate_limited_until, time.time() + seconds)
+
+
+def melong_is_rate_limited() -> bool:
+    import time
+
+    return time.time() < _rate_limited_until
 
 
 def get_llm() -> LLMService:

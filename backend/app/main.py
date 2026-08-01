@@ -46,6 +46,14 @@ async def lifespan(_: FastAPI):
         ):
             await conn.execute(text(stmt))
     await seed_content_library()
+    if settings.embedding_preload:
+        from app.rag.embeddings import get_embeddings
+
+        get_embeddings().warm_async()
+        logger.info(
+            "Embedding model warming in background (%s)",
+            settings.embedding_model,
+        )
     logger.info(
         "%s API ready (llm=melong via %s)",
         settings.app_name,

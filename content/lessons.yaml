@@ -1,0 +1,983 @@
+content_version: 2
+theme_hints:
+- theme: family
+  hints:
+  - family
+  - mother
+  - father
+  - home
+  - friend
+  - ཁྱིམ
+  - ཨ་མ
+  - ཨ་པ
+  - གྲོགས
+  - སྤུན
+- theme: school
+  hints:
+  - school
+  - classroom
+  - homework
+  - notebook
+  - སློབ་གྲྭ
+  - དེབ
+  - འབྲི
+  - ཀློག
+  - སྨྱུག་གུ
+- theme: greetings
+  hints:
+  - greet
+  - hello
+  - polite
+  - thank
+  - བཀྲ་ཤིས
+  - ཐུགས་རྗེ
+  - ཞེ་ས
+  - འཚམས
+- theme: nature
+  hints:
+  - nature
+  - mountain
+  - river
+  - sun
+  - flower
+  - རི
+  - ཆུ
+  - མེ་ཏོག
+  - གནམ
+  - རང་བྱུང
+- theme: food
+  hints:
+  - food
+  - eat
+  - tea
+  - rice
+  - cook
+  - meal
+  - ཇ་
+  - ཟ་
+  - ཐུག་པ
+  - ཁ་ལག
+  - ཞོ
+  - ཟས
+- theme: animals
+  hints:
+  - animal
+  - dog
+  - cat
+  - yak
+  - bird
+  - ཁྱི
+  - གཡག
+  - སེམས་ཅན
+  - ཕྱུགས
+- theme: body
+  hints:
+  - body
+  - hand
+  - eye
+  - head
+  - མགོ
+  - ལག་པ
+  - མིག
+  - ལུས
+  - རྐང་པ
+- theme: colors
+  hints:
+  - color
+  - colour
+  - red
+  - blue
+  - ཁ་དོག
+  - དམར་པོ
+  - སྔོན་པོ
+  - ལྗང་ཁུ
+- theme: numbers
+  hints:
+  - number
+  - count
+  - གྲངས་ཀ
+  - གཅིག
+  - གཉིས
+  - གསུམ
+lessons:
+  greetings:
+    tibetan_title: འཚམས་འདྲི་སློབ་ཚན།
+    focus: ཉིན་ལྟར་གྱི་འཚམས་འདྲི་དང་ཞེ་སའི་ཚིག
+    level: འགོ་འཛུགས།
+    minutes: 12
+    words:
+    - tibetan: བཀྲ་ཤིས་བདེ་ལེགས།
+      wylie: bkra shis bde legs
+      english: hello / greetings
+      example: བཀྲ་ཤིས་བདེ་ལེགས། ཁྱེད་རང་བདེ་པོ་ཡིན་པས།
+      example_en: Hello! How are you?
+    - tibetan: ཐུགས་རྗེ་ཆེ།
+      wylie: thugs rje che
+      english: thank you
+      example: རོགས་རམ་བྱས་པར་ཐུགས་རྗེ་ཆེ།
+      example_en: Thank you for your help.
+    - tibetan: དགོངས་དག
+      wylie: dgongs dag
+      english: sorry / excuse me
+      example: དགོངས་དག ང་ཡུད་ཙམ་འགྱངས་སོང་།
+      example_en: Sorry, I am a little late.
+    - tibetan: ལགས་སོ།
+      wylie: lags so
+      english: yes (polite)
+      example: ལགས་སོ། ང་འགྲོ་གི་ཡིན།
+      example_en: Yes. I will go.
+    - tibetan: ག་ལེར་ཕེབས།
+      wylie: ga ler phebs
+      english: goodbye (polite)
+      example: དེ་རིང་ཚར། ག་ལེར་ཕེབས།
+      example_en: That's all for today. Goodbye.
+    - tibetan: ཁྱེད་རང་བདེ་པོ་ཡིན་པས།
+      wylie: khyed rang bde po yin pas
+      english: how are you?
+      example: བཀྲ་ཤིས་བདེ་ལེགས། ཁྱེད་རང་བདེ་པོ་ཡིན་པས།
+      example_en: Hello, how are you?
+    dialogue:
+    - speaker: A
+      tibetan: བཀྲ་ཤིས་བདེ་ལེགས། ཁྱེད་རང་བདེ་པོ་ཡིན་པས།
+      wylie: bkra shis bde legs. khyed rang bde po yin pas
+      english: Hello! How are you?
+    - speaker: B
+      tibetan: བཀྲ་ཤིས་བདེ་ལེགས། ང་བདེ་པོ་ཡིན། ཁྱེད་རང་ཡང་བདེ་པོ་ཡིན་པས།
+      wylie: bkra shis bde legs. nga bde po yin. khyed rang yang bde po yin pas
+      english: Hello! I am fine. Are you fine too?
+    - speaker: A
+      tibetan: ལགས་སོ། ང་ཡང་བདེ་པོ་ཡིན། ཐུགས་རྗེ་ཆེ།
+      wylie: lags so. nga yang bde po yin. thugs rje che
+      english: Yes, I am fine too. Thank you.
+    - speaker: B
+      tibetan: དེ་རིང་སློབ་གྲྭར་འགྲོ་དགོས། ག་ལེར་ཕེབས།
+      wylie: de ring slob grwar 'gro dgos. ga ler phebs
+      english: I need to go to school today. Goodbye.
+    - speaker: A
+      tibetan: ལགས་སོ། ག་ལེར་ཕེབས།
+      wylie: lags so. ga ler phebs
+      english: Okay. Goodbye.
+    - speaker: B
+      tibetan: སང་ཉིན་མཇལ་ཡོང་།
+      wylie: sang nyin mjal yong
+      english: See you tomorrow.
+    notes: འཚམས་འདྲིའི་སྐབས་སུ་བཀྲ་ཤིས་བདེ་ལེགས། ཞེས་པ་སྤྱིར་བཏང་གི་འབོད་སྐད་ཡིན། ཞེ་ས་སྤྱོད་ན་ཁྱེད་རང་།
+      ཐུགས་རྗེ་ཆེ། ག་ལེར་ཕེབས། སོགས་བེད་སྤྱོད་བྱེད། དགོངས་དག ནི་ནོར་བ་ཡོད་ནམ་འགོར་ན་བེད་སྤྱོད་བྱེད་པའི་ཚིག་ཡིན།
+      ལགས་སོ། ནི་ཞེ་སའི་འཐད་པ་སྟོན་པའི་ལན་ཡིན།
+    quiz:
+    - q: བཀྲ་ཤིས་བདེ་ལེགས། གི་དོན་གང་ཡིན།
+      highlight: བཀྲ་ཤིས་བདེ་ལེགས།
+      options:
+      - hello / greetings
+      - thank you
+      - sorry
+      - goodbye
+      answer: 0
+    - q: ཐུགས་རྗེ་ཆེ། གི་དོན་གང་ཡིན།
+      highlight: ཐུགས་རྗེ་ཆེ།
+      options:
+      - please
+      - thank you
+      - 'yes'
+      - school
+      answer: 1
+    - q: ཕྱིར་ལོག་སྐབས་ཞེ་སའི་ཚིག་གང་ཡིན།
+      highlight: ''
+      options:
+      - ག་ལེར་ཕེབས།
+      - ཨ་མ
+      - ཆུ
+      - གཅིག
+      answer: 0
+  family:
+    tibetan_title: ཁྱིམ་ཚང་གི་མིང་ཚིག
+    focus: ཁྱིམ་མི་དང་གྲོགས་པོའི་མིང་ཚིག
+    level: འགོ་འཛུགས།
+    minutes: 12
+    words:
+    - tibetan: ཨ་མ
+      wylie: a ma
+      english: mother
+      example: ངའི་ཨ་མ་སློབ་གྲྭར་ཡོང་གི་རེད།
+      example_en: My mother is coming to school.
+    - tibetan: ཨ་པ
+      wylie: a pa
+      english: father
+      example: ངའི་ཨ་པ་ལས་ཀ་ལ་ཕེབས་སོང་།
+      example_en: My father went to work.
+    - tibetan: སྤུན
+      wylie: spun
+      english: sibling
+      example: ང་ལ་སྤུན་གཉིས་ཡོད།
+      example_en: I have two siblings.
+    - tibetan: གྲོགས་པོ
+      wylie: grogs po
+      english: friend
+      example: ངའི་གྲོགས་པོ་སློབ་གྲྭར་ཡོད།
+      example_en: My friend is at school.
+    - tibetan: དགེ་རྒན
+      wylie: dge rgan
+      english: teacher
+      example: དགེ་རྒན་ལགས་བཀྲ་ཤིས་བདེ་ལེགས།
+      example_en: Hello, teacher.
+    - tibetan: བུ་མོ
+      wylie: bu mo
+      english: girl / daughter
+      example: བུ་མོ་དེ་དེབ་ཀློག་གི་འདུག
+      example_en: That girl is reading a book.
+    dialogue:
+    - speaker: A
+      tibetan: ཁྱེད་རང་གི་ཁྱིམ་མི་ག་ཚོད་ཡོད།
+      wylie: khyed rang gi khyim mi ga tshod yod
+      english: How many people are in your family?
+    - speaker: B
+      tibetan: ང་ལ་ཨ་མ་དང་ཨ་པ། སྤུན་གཅིག་ཡོད།
+      wylie: nga la a ma dang a pa. spun gcig yod
+      english: I have a mother, a father, and one sibling.
+    - speaker: A
+      tibetan: ཁྱེད་རང་གི་གྲོགས་པོ་ག་པར་ཡོད།
+      wylie: khyed rang gi grogs po ga par yod
+      english: Where is your friend?
+    - speaker: B
+      tibetan: ངའི་གྲོགས་པོ་སློབ་གྲྭར་ཡོད། དགེ་རྒན་དང་མཉམ་དུ་ཡོད།
+      wylie: nga'i grogs po slob grwar yod. dge rgan dang mnyam du yod
+      english: My friend is at school, with the teacher.
+    - speaker: A
+      tibetan: ཨ་མ་ལ་ཐུགས་རྗེ་ཆེ་ཞུ་རོགས།
+      wylie: a ma la thugs rje che zhu rogs
+      english: Please say thank you to your mother.
+    - speaker: B
+      tibetan: ལགས་སོ། ང་ཨ་མ་ལ་བཤད་ཀྱི་ཡིན།
+      wylie: lags so. nga a ma la bshad kyi yin
+      english: Okay. I will tell my mother.
+    notes: ཁྱིམ་ཚང་གི་མིང་ཚིག་ནང་ཨ་མ་དང་ཨ་པ་ནི་ཕ་མ་ཡིན། སྤུན་ནི་ཕུ་ནུ་མོ་སྤུན་མཆེད་ལ་གོ། གྲོགས་པོ་ནི་མཛའ་གྲོགས་ཡིན།
+      དགེ་རྒན་ནི་སློབ་གྲྭའི་དགེ་རྒན་ལ་ཞེ་ས་སྤྱོད་སྐབས་བེད་སྤྱོད་བྱེད། ང་ལ་…ཡོད། ཞེས་པས་རང་ལ་ཡོད་པ་སྟོན།
+    quiz:
+    - q: ཨ་མ གི་དོན་གང་ཡིན།
+      highlight: ཨ་མ
+      options:
+      - father
+      - mother
+      - friend
+      - teacher
+      answer: 1
+    - q: དགེ་རྒན གི་དོན་གང་ཡིན།
+      highlight: དགེ་རྒན
+      options:
+      - student
+      - sibling
+      - teacher
+      - girl
+      answer: 2
+    - q: ངའི་______་སློབ་གྲྭར་ཡོད། (friend)
+      highlight: ''
+      options:
+      - གྲོགས་པོ
+      - ཆུ
+      - ཉི་མ
+      - གསུམ
+      answer: 0
+  school:
+    tibetan_title: སློབ་གྲྭའི་མིང་ཚིག
+    focus: སློབ་གྲྭ་དང་སློབ་སྦྱོང་གི་མིང་ཚིག
+    level: འགོ་འཛུགས།
+    minutes: 12
+    words:
+    - tibetan: སློབ་གྲྭ
+      wylie: slob grwa
+      english: school
+      example: ང་སློབ་གྲྭར་འགྲོ་གི་ཡིན།
+      example_en: I am going to school.
+    - tibetan: དེབ
+      wylie: deb
+      english: book
+      example: འདི་ངའི་དེབ་ཡིན།
+      example_en: This is my book.
+    - tibetan: སྨྱུག་གུ
+      wylie: smyug gu
+      english: pen
+      example: སྨྱུག་གུ་ག་པར་ཡོད།
+      example_en: Where is the pen?
+    - tibetan: ཤོག་བུ
+      wylie: shog bu
+      english: paper
+      example: ཤོག་བུ་གཅིག་སྤྲོད་རོགས།
+      example_en: Please give me one paper.
+    - tibetan: སློབ་ཕྲུག
+      wylie: slob phrug
+      english: student
+      example: ང་སློབ་ཕྲུག་ཡིན།
+      example_en: I am a student.
+    - tibetan: དྲི་བ
+      wylie: dri ba
+      english: question
+      example: ང་ལ་དྲི་བ་གཅིག་ཡོད།
+      example_en: I have one question.
+    dialogue:
+    - speaker: A
+      tibetan: ཁྱེད་རང་གི་དེབ་ག་པར་ཡོད།
+      wylie: khyed rang gi deb ga par yod
+      english: Where is your book?
+    - speaker: B
+      tibetan: ངའི་དེབ་འདིར་ཡོད། སྨྱུག་གུ་ཡང་ཡོད།
+      wylie: nga'i deb 'dir yod. smyug gu yang yod
+      english: My book is here. I also have a pen.
+    - speaker: A
+      tibetan: ཤོག་བུ་གཅིག་སྤྲོད་ཐུབ་བམ།
+      wylie: shog bu gcig sprod thub bam
+      english: Can you give me one paper?
+    - speaker: B
+      tibetan: ལགས་སོ། འདི་ཡིན།
+      wylie: lags so. 'di yin
+      english: Yes. Here it is.
+    - speaker: A
+      tibetan: ཐུགས་རྗེ་ཆེ། ང་སློབ་ཕྲུག་ཡིན། དྲི་བ་གཅིག་ཡོད།
+      wylie: thugs rje che. nga slob phrug yin. dri ba gcig yod
+      english: Thank you. I am a student. I have a question.
+    - speaker: B
+      tibetan: དྲི་བ་དྲིས་ཆོག ང་རོགས་བྱེད་ཀྱི་ཡིན།
+      wylie: dri ba dris chog. nga rogs byed kyi yin
+      english: You may ask. I will help.
+    notes: སློབ་གྲྭ་ནི་སློབ་སྦྱོང་བྱེད་སའི་ས་གནས་ཡིན། དེབ་དང་སྨྱུག་གུ། ཤོག་བུ་ནི་སློབ་ཁྲིད་ཀྱི་ཡོ་བྱད་གཙོ་བོ་ཡིན།
+      སློབ་ཕྲུག་ནི་སློབ་སྦྱོང་བྱེད་མཁན་ཡིན། ག་པར་ཡོད། ནི་གནས་ས་འདྲི་བའི་དྲི་བ་ཡིན། འདིར་ཡོད། ནི་ལན་ཡིན།
+    quiz:
+    - q: སློབ་གྲྭ གི་དོན་གང་ཡིན།
+      highlight: སློབ་གྲྭ
+      options:
+      - book
+      - school
+      - pen
+      - paper
+      answer: 1
+    - q: སྨྱུག་གུ གི་དོན་གང་ཡིན།
+      highlight: སྨྱུག་གུ
+      options:
+      - pen
+      - student
+      - question
+      - water
+      answer: 0
+    - q: ང་______་ཡིན། (student)
+      highlight: ''
+      options:
+      - སློབ་ཕྲུག
+      - ཉི་མ
+      - ཁྱི
+      - ཞོ
+      answer: 0
+  nature:
+    tibetan_title: རང་བྱུང་ཁོར་ཡུག
+    focus: གནམ་ལོ་དང་རང་བྱུང་གི་མིང་ཚིག
+    level: འགོ་འཛུགས།
+    minutes: 12
+    words:
+    - tibetan: ཉི་མ
+      wylie: nyi ma
+      english: sun
+      example: དེ་རིང་ཉི་མ་འོད་ཆེན་པོ་འདུག
+      example_en: The sun is bright today.
+    - tibetan: ཟླ་བ
+      wylie: zla ba
+      english: moon
+      example: དོ་དགོང་ཟླ་བ་མཛེས་པོ་འདུག
+      example_en: The moon is beautiful tonight.
+    - tibetan: ཆུ
+      wylie: chu
+      english: water
+      example: ང་ཆུ་འཐུང་དགོས།
+      example_en: I need to drink water.
+    - tibetan: རི
+      wylie: ri
+      english: mountain
+      example: རི་དེ་མཐོ་པོ་འདུག
+      example_en: That mountain is high.
+    - tibetan: མེ་ཏོག
+      wylie: me tog
+      english: flower
+      example: མེ་ཏོག་དམར་པོ་འདི་མཛེས་པོ་འདུག
+      example_en: This red flower is beautiful.
+    - tibetan: ཤིང
+      wylie: shing
+      english: tree
+      example: ཤིང་འོག་ཏུ་སྡོད།
+      example_en: Sit under the tree.
+    dialogue:
+    - speaker: A
+      tibetan: དེ་རིང་ཉི་མ་ཡག་པོ་འདུག་གམ།
+      wylie: de ring nyi ma yag po 'dug gam
+      english: Is the sun nice today?
+    - speaker: B
+      tibetan: ལགས་སོ། ཉི་མ་འོད་ཆེན་པོ་འདུག རི་ཡང་མཐོང་གི་འདུག
+      wylie: lags so. nyi ma 'od chen po 'dug. ri yang mthong gi 'dug
+      english: Yes. The sun is bright. We can see the mountain too.
+    - speaker: A
+      tibetan: མེ་ཏོག་ག་པར་ཡོད།
+      wylie: me tog ga par yod
+      english: Where are the flowers?
+    - speaker: B
+      tibetan: མེ་ཏོག་ཤིང་འོག་ཏུ་ཡོད། ཆུ་ཡང་ཉེ་འགྲམ་དུ་ཡོད།
+      wylie: me tog shing 'og tu yod. chu yang nye 'gram du yod
+      english: The flowers are under the tree. Water is nearby too.
+    - speaker: A
+      tibetan: དོ་དགོང་ཟླ་བ་ལྟ་རུ་འགྲོ་དགོས།
+      wylie: do dgong zla ba lta ru 'gro dgos
+      english: Tonight we should go see the moon.
+    - speaker: B
+      tibetan: ཡག་པོ་རེད། མཉམ་དུ་འགྲོ།
+      wylie: yag po red. mnyam du 'gro
+      english: Great. Let's go together.
+    notes: རང་བྱུང་གི་མིང་ཚིག་ནང་ཉི་མ་དང་ཟླ་བ་ནི་གནམ་གྱི་སྐར་མ་གཉིས་ཡིན། ཆུ་ནི་འཐུང་རྒྱུ་དང་ཆུ་བོ་ལའང་གོ།
+      རི་ནི་མཐོ་སའི་ས་གནས་ཡིན། མེ་ཏོག་དང་ཤིང་ནི་རྩི་ཤིང་གི་སྐོར་ཡིན། འདུག ནི་མཐོང་ཐུབ་པའམ་ཡོད་པ་སྟོན་པའི་ཚིག་གྲོགས་ཡིན།
+    quiz:
+    - q: ཉི་མ གི་དོན་གང་ཡིན།
+      highlight: ཉི་མ
+      options:
+      - moon
+      - sun
+      - water
+      - tree
+      answer: 1
+    - q: མེ་ཏོག གི་དོན་གང་ཡིན།
+      highlight: མེ་ཏོག
+      options:
+      - flower
+      - mountain
+      - fish
+      - pen
+      answer: 0
+    - q: ང་______་འཐུང་དགོས། (water)
+      highlight: ''
+      options:
+      - ཆུ
+      - རི
+      - ཤིང
+      - དེབ
+      answer: 0
+  food:
+    tibetan_title: ཁ་ཟས་ཀྱི་མིང་ཚིག
+    focus: ཉིན་ལྟར་གྱི་ཁ་ཟས་དང་འཐུང་ཆུ
+    level: འགོ་འཛུགས།
+    minutes: 12
+    words:
+    - tibetan: ཇ
+      wylie: ja
+      english: tea
+      example: ང་ཇ་འཐུང་གི་ཡིན།
+      example_en: I will drink tea.
+    - tibetan: ཐུག་པ
+      wylie: thug pa
+      english: noodle soup
+      example: དེ་རིང་ཐུག་པ་ཟ་དགོས།
+      example_en: Today we should eat thukpa.
+    - tibetan: འབྲས
+      wylie: '''bras'
+      english: rice
+      example: འབྲས་ཏོག་ཙམ་སྤྲོད་རོགས།
+      example_en: Please give a little rice.
+    - tibetan: ཞོ
+      wylie: zho
+      english: yogurt
+      example: ཞོ་འདི་ཞིམ་པོ་འདུག
+      example_en: This yogurt is tasty.
+    - tibetan: མར
+      wylie: mar
+      english: butter
+      example: ཇ་མར་བླུགས།
+      example_en: Put butter in the tea.
+    - tibetan: ཆུ
+      wylie: chu
+      english: water
+      example: ཆུ་གཙང་མ་འཐུང་།
+      example_en: Drink clean water.
+    dialogue:
+    - speaker: A
+      tibetan: ཁྱེད་རང་ག་རེ་ཟ་འདོད་ཡོད།
+      wylie: khyed rang ga re za 'dod yod
+      english: What do you want to eat?
+    - speaker: B
+      tibetan: ང་ཐུག་པ་ཟ་འདོད་ཡོད། ཁྱེད་རང་ག་རེ་ཟ།
+      wylie: nga thug pa za 'dod yod. khyed rang ga re za
+      english: I want to eat thukpa. What will you eat?
+    - speaker: A
+      tibetan: ང་འབྲས་དང་ཞོ་ཟ་གི་ཡིན།
+      wylie: nga 'bras dang zho za gi yin
+      english: I will eat rice and yogurt.
+    - speaker: B
+      tibetan: ཇ་འཐུང་གམ།
+      wylie: ja 'thung gam
+      english: Will you drink tea?
+    - speaker: A
+      tibetan: ལགས་སོ། ཇ་མར་ཅན་གཅིག་སྤྲོད་རོགས།
+      wylie: lags so. ja mar can gcig sprod rogs
+      english: Yes. Please give one butter tea.
+    - speaker: B
+      tibetan: ཆུ་ཡང་དགོས་ན་བཤད་རོགས།
+      wylie: chu yang dgos na bshad rogs
+      english: If you also need water, please say so.
+    notes: བོད་ཀྱི་ཁ་ཟས་ནང་ཐུག་པ་དང་ཇ་མར་ནི་ཉིན་ལྟར་གྱི་ཟས་གཙོ་བོ་ཡིན། ཞོ་ནི་འོ་མ་ལས་བཟོས་པའི་ཁ་ཟས་ཡིན།
+      ཟ་འདོད་ཡོད། ནི་ཟ་འདོད་པ་སྟོན། འཐུང་། ནི་ཆང་ཆུ་སོགས་འཐུང་བ་ལ་གོ། ཞིམ་པོ་ནི་བྲོ་བ་ཡག་པ་སྟོན་པའི་ཚིག་ཡིན།
+    quiz:
+    - q: ཐུག་པ གི་དོན་གང་ཡིན།
+      highlight: ཐུག་པ
+      options:
+      - tea
+      - rice
+      - noodle soup
+      - butter
+      answer: 2
+    - q: ཇ གི་དོན་གང་ཡིན།
+      highlight: ཇ
+      options:
+      - tea
+      - water
+      - yogurt
+      - pen
+      answer: 0
+    - q: ང་______་འཐུང་གི་ཡིན། (tea)
+      highlight: ''
+      options:
+      - ཇ
+      - རི
+      - དེབ
+      - ཁྱི
+      answer: 0
+  animals:
+    tibetan_title: སེམས་ཅན་གྱི་མིང་ཚིག
+    focus: ཕྱུགས་དང་སེམས་ཅན་ངོས་འཛིན།
+    level: འགོ་འཛུགས།
+    minutes: 12
+    words:
+    - tibetan: ཁྱི
+      wylie: khyi
+      english: dog
+      example: ཁྱི་དེ་རྒྱུག་གི་འདུག
+      example_en: That dog is running.
+    - tibetan: ཞི་མི
+      wylie: zhi mi
+      english: cat
+      example: ཞི་མི་འདི་ཉལ་གྱི་འདུག
+      example_en: This cat is sleeping.
+    - tibetan: གཡག
+      wylie: g.yag
+      english: yak
+      example: གཡག་ནི་བོད་ཀྱི་ཕྱུགས་གཙོ་བོ་ཡིན།
+      example_en: The yak is an important Tibetan animal.
+    - tibetan: རྟ
+      wylie: rta
+      english: horse
+      example: རྟ་མགྱོགས་པོ་རྒྱུག་གི་རེད།
+      example_en: The horse runs fast.
+    - tibetan: བྱ
+      wylie: bya
+      english: bird
+      example: བྱ་ནམ་མཁར་འཕུར་གྱི་འདུག
+      example_en: The bird is flying in the sky.
+    - tibetan: ཉ
+      wylie: nya
+      english: fish
+      example: ཉ་ཆུ་ནང་དུ་ཡོད།
+      example_en: The fish is in the water.
+    dialogue:
+    - speaker: A
+      tibetan: ཁྱེད་རང་ལ་སེམས་ཅན་ཡོད་དམ།
+      wylie: khyed rang la sems can yod dam
+      english: Do you have an animal?
+    - speaker: B
+      tibetan: ལགས་སོ། ང་ལ་ཁྱི་གཅིག་ཡོད།
+      wylie: lags so. nga la khyi gcig yod
+      english: Yes. I have one dog.
+    - speaker: A
+      tibetan: ཞི་མི་ཡང་ཡོད་དམ།
+      wylie: zhi mi yang yod dam
+      english: Do you also have a cat?
+    - speaker: B
+      tibetan: མེད། འོན་ཀྱང་ངའི་གྲོགས་པོ་ལ་ཞི་མི་ཡོད།
+      wylie: med. 'on kyang nga'i grogs po la zhi mi yod
+      english: No. But my friend has a cat.
+    - speaker: A
+      tibetan: བོད་ལ་གཡག་མང་པོ་ཡོད། རྟ་ཡང་ཡོད།
+      wylie: bod la g.yag mang po yod. rta yang yod
+      english: In Tibet there are many yaks. There are horses too.
+    - speaker: B
+      tibetan: བྱ་དང་ཉ་ཡང་མཐོང་ཡོང་།
+      wylie: bya dang nya yang mthong yong
+      english: We will also see birds and fish.
+    notes: སེམས་ཅན་གྱི་མིང་ཚིག་ནང་ཁྱི་དང་ཞི་མི་ནི་ཁྱིམ་གྱི་སེམས་ཅན་ཡིན། གཡག་ནི་བོད་ཀྱི་རིག་གནས་དང་འཚོ་བར་གལ་ཆེན་པོ་ཡིན།
+      རྟ་ནི་འགྲོ་སྐྱོད་ལ་བེད་སྤྱོད་བྱེད། བྱ་ནམ་མཁར་འཕུར། ཉ་ཆུ་ནང་གནས། ཡོད་དམ། / མེད། ནི་ཡོད་མེད་འདྲི་བའི་ལམ་ལུགས་ཡིན།
+    quiz:
+    - q: ཁྱི གི་དོན་གང་ཡིན།
+      highlight: ཁྱི
+      options:
+      - cat
+      - dog
+      - bird
+      - yak
+      answer: 1
+    - q: གཡག གི་དོན་གང་ཡིན།
+      highlight: གཡག
+      options:
+      - horse
+      - fish
+      - yak
+      - flower
+      answer: 2
+    - q: ______་ཆུ་ནང་དུ་ཡོད། (fish)
+      highlight: ''
+      options:
+      - ཉ
+      - རྟ
+      - བྱ
+      - ཨ་མ
+      answer: 0
+  body:
+    tibetan_title: ལུས་པོའི་མིང་ཚིག
+    focus: ལུས་ཀྱི་ཆ་ཤས་ངོས་འཛིན།
+    level: འགོ་འཛུགས།
+    minutes: 10
+    words:
+    - tibetan: མགོ
+      wylie: mgo
+      english: head
+      example: ངའི་མགོ་ན་གི་འདུག
+      example_en: My head hurts.
+    - tibetan: མིག
+      wylie: mig
+      english: eye
+      example: མིག་གཉིས་ཀྱིས་ལྟ།
+      example_en: Look with both eyes.
+    - tibetan: ལག་པ
+      wylie: lag pa
+      english: hand
+      example: ལག་པ་གཙང་མ་བཟོ།
+      example_en: Wash your hands.
+    - tibetan: རྐང་པ
+      wylie: rkang pa
+      english: foot
+      example: རྐང་པ་གཉིས་ཀྱིས་འགྲོ།
+      example_en: Walk with both feet.
+    - tibetan: རྣ་བ
+      wylie: rna ba
+      english: ear
+      example: རྣ་བ་ཀྱིས་ཉོན།
+      example_en: Listen with your ears.
+    - tibetan: ཁ
+      wylie: kha
+      english: mouth
+      example: ཁ་ནས་བཤད།
+      example_en: Speak with your mouth.
+    dialogue:
+    - speaker: A
+      tibetan: འདི་ག་རེ་ཡིན། མགོ་ཡིན་ནམ།
+      wylie: '''di ga re yin. mgo yin nam'
+      english: What is this? Is it the head?
+    - speaker: B
+      tibetan: ལགས་སོ། འདི་མགོ་ཡིན། འདི་མིག་ཡིན།
+      wylie: lags so. 'di mgo yin. 'di mig yin
+      english: Yes. This is the head. This is the eye.
+    - speaker: A
+      tibetan: ལག་པ་ག་པར་ཡོད།
+      wylie: lag pa ga par yod
+      english: Where is the hand?
+    - speaker: B
+      tibetan: ལག་པ་འདིར་ཡོད། རྐང་པ་འོག་ཏུ་ཡོད།
+      wylie: lag pa 'dir yod. rkang pa 'og tu yod
+      english: The hand is here. The foot is below.
+    - speaker: A
+      tibetan: རྣ་བ་ཀྱིས་ག་རེ་བྱེད།
+      wylie: rna ba kyis ga re byed
+      english: What do ears do?
+    - speaker: B
+      tibetan: རྣ་བ་ཀྱིས་ཉན། ཁ་ནས་བཤད།
+      wylie: rna ba kyis nyan. kha nas bshad
+      english: Ears listen. The mouth speaks.
+    notes: ལུས་པོའི་ཆ་ཤས་ངོས་འཛིན་ན་སྐད་ཆ་དང་འཕྲོད་བསྟེན་ལ་ཕན། མགོ། མིག། རྣ་བ། ཁ། ལག་པ། རྐང་པ་ནི་གཞི་རྩའི་མིང་ཚིག་ཡིན།
+      གཉིས་ཞེས་པས་གྲངས་ཀ་གཉིས་སྟོན།
+    quiz:
+    - q: མིག གི་དོན་གང་ཡིན།
+      highlight: མིག
+      options:
+      - ear
+      - eye
+      - hand
+      - foot
+      answer: 1
+    - q: ལག་པ གི་དོན་གང་ཡིན།
+      highlight: ལག་པ
+      options:
+      - hand
+      - head
+      - mouth
+      - sun
+      answer: 0
+    - q: ______་ཀྱིས་ཉོན། (ear)
+      highlight: ''
+      options:
+      - རྣ་བ
+      - རྐང་པ
+      - ཆུ
+      - དེབ
+      answer: 0
+  colors:
+    tibetan_title: ཁ་དོག་གི་མིང་ཚིག
+    focus: ཁ་དོག་ངོས་འཛིན་དང་བེད་སྤྱོད།
+    level: འགོ་འཛུགས།
+    minutes: 10
+    words:
+    - tibetan: དཀར་པོ
+      wylie: dkar po
+      english: white
+      example: ཤོག་བུ་དཀར་པོ་ཡིན།
+      example_en: The paper is white.
+    - tibetan: ནག་པོ
+      wylie: nag po
+      english: black
+      example: སྨྱུག་གུ་ནག་པོ་ཡིན།
+      example_en: The pen is black.
+    - tibetan: དམར་པོ
+      wylie: dmar po
+      english: red
+      example: མེ་ཏོག་དམར་པོ་འདུག
+      example_en: The flower is red.
+    - tibetan: སྔོན་པོ
+      wylie: sngon po
+      english: blue
+      example: གནམ་སྔོན་པོ་འདུག
+      example_en: The sky is blue.
+    - tibetan: སེར་པོ
+      wylie: ser po
+      english: yellow
+      example: ཉི་མ་སེར་པོ་འདུག
+      example_en: The sun looks yellow.
+    - tibetan: ལྗང་ཁུ
+      wylie: ljang khu
+      english: green
+      example: ཤིང་ལོ་ལྗང་ཁུ་ཡིན།
+      example_en: The leaves are green.
+    dialogue:
+    - speaker: A
+      tibetan: མེ་ཏོག་འདི་ཁ་དོག་ག་རེ་ཡིན།
+      wylie: me tog 'di kha dog ga re yin
+      english: What color is this flower?
+    - speaker: B
+      tibetan: མེ་ཏོག་འདི་དམར་པོ་ཡིན།
+      wylie: me tog 'di dmar po yin
+      english: This flower is red.
+    - speaker: A
+      tibetan: གནམ་སྔོན་པོ་ཡིན་ནམ།
+      wylie: gnam sngon po yin nam
+      english: Is the sky blue?
+    - speaker: B
+      tibetan: ལགས་སོ། གནམ་སྔོན་པོ་ཡིན། ཤིང་ལོ་ལྗང་ཁུ་ཡིན།
+      wylie: lags so. gnam sngon po yin. shing lo ljang khu yin
+      english: Yes. The sky is blue. The leaves are green.
+    - speaker: A
+      tibetan: ཤོག་བུ་དཀར་པོ་དང་སྨྱུག་གུ་ནག་པོ་སྤྲོད་རོགས།
+      wylie: shog bu dkar po dang smyug gu nag po sprod rogs
+      english: Please give white paper and a black pen.
+    - speaker: B
+      tibetan: འདི་ཡིན། ཉི་མ་སེར་པོ་འདུག
+      wylie: '''di yin. nyi ma ser po ''dug'
+      english: Here. The sun looks yellow.
+    notes: བོད་ཡིག་ནང་ཁ་དོག་གི་མིང་ལ་ཕལ་ཆེར་པོ་སྦྱར་གྱི་ཡོད། དཔེར་ན་དམར་པོ། སྔོན་པོ། དཀར་པོ། ལྗང་ཁུ་ནི་ལྗང་གུའི་དོན་ཡིན།
+      ཁ་དོག་ག་རེ་ཡིན། ནི་ཁ་དོག་འདྲི་བའི་དྲི་བ་ཡིན།
+    quiz:
+    - q: དམར་པོ གི་དོན་གང་ཡིན།
+      highlight: དམར་པོ
+      options:
+      - blue
+      - red
+      - green
+      - white
+      answer: 1
+    - q: ལྗང་ཁུ གི་དོན་གང་ཡིན།
+      highlight: ལྗང་ཁུ
+      options:
+      - green
+      - black
+      - yellow
+      - tea
+      answer: 0
+    - q: གནམ་______་ཡིན། (blue)
+      highlight: ''
+      options:
+      - སྔོན་པོ
+      - ནག་པོ
+      - ཐུག་པ
+      - ཁྱི
+      answer: 0
+  numbers:
+    tibetan_title: གྲངས་ཀའི་སློབ་ཚན།
+    focus: གཅིག་ནས་བཅུ་བར་གྲངས་ཀ
+    level: འགོ་འཛུགས།
+    minutes: 10
+    words:
+    - tibetan: གཅིག
+      wylie: gcig
+      english: one
+      example: དེབ་གཅིག་ཡོད།
+      example_en: There is one book.
+    - tibetan: གཉིས
+      wylie: gnyis
+      english: two
+      example: མིག་གཉིས་ཡོད།
+      example_en: There are two eyes.
+    - tibetan: གསུམ
+      wylie: gsum
+      english: three
+      example: སློབ་ཕྲུག་གསུམ་ཡོད།
+      example_en: There are three students.
+    - tibetan: བཞི
+      wylie: bzhi
+      english: four
+      example: ལག་པའི་མཛུབ་མོ་བཞི།
+      example_en: Four fingers (plus thumb).
+    - tibetan: ལྔ
+      wylie: lnga
+      english: five
+      example: ལག་པ་གཅིག་ལ་མཛུབ་མོ་ལྔ་ཡོད།
+      example_en: One hand has five fingers.
+    - tibetan: བཅུ
+      wylie: bcu
+      english: ten
+      example: མཛུབ་མོ་བཅུ་ཡོད།
+      example_en: There are ten fingers.
+    dialogue:
+    - speaker: A
+      tibetan: དེབ་ག་ཚོད་ཡོད།
+      wylie: deb ga tshod yod
+      english: How many books are there?
+    - speaker: B
+      tibetan: དེབ་གསུམ་ཡོད།
+      wylie: deb gsum yod
+      english: There are three books.
+    - speaker: A
+      tibetan: སྨྱུག་གུ་གཉིས་སྤྲོད་རོགས།
+      wylie: smyug gu gnyis sprod rogs
+      english: Please give two pens.
+    - speaker: B
+      tibetan: འདི་གཅིག་དང་འདི་གཉིས།
+      wylie: '''di gcig dang ''di gnyis'
+      english: This is one and this is two.
+    - speaker: A
+      tibetan: ལག་པ་གཅིག་ལ་མཛུབ་མོ་ལྔ་ཡོད།
+      wylie: lag pa gcig la mdzub mo lnga yod
+      english: One hand has five fingers.
+    - speaker: B
+      tibetan: ལག་པ་གཉིས་ལ་མཛུབ་མོ་བཅུ་ཡོད།
+      wylie: lag pa gnyis la mdzub mo bcu yod
+      english: Two hands have ten fingers.
+    notes: བོད་ཡིག་གི་གྲངས་ཀ་གཅིག་ནས་བཅུ་བར་སློབས། ག་ཚོད་ཡོད། ནི་གྲངས་ཀ་འདྲི་བའི་དྲི་བ་ཡིན། ལན་སྤྲོད་སྐབས་མིང་ཚིག་གི་རྗེས་སུ་གྲངས་ཀ་འཇོག
+      དཔེར་ན་དེབ་གསུམ།
+    quiz:
+    - q: གསུམ གི་དོན་གང་ཡིན།
+      highlight: གསུམ
+      options:
+      - one
+      - two
+      - three
+      - ten
+      answer: 2
+    - q: བཅུ གི་དོན་གང་ཡིན།
+      highlight: བཅུ
+      options:
+      - five
+      - four
+      - ten
+      - zero
+      answer: 2
+    - q: དེབ་______་ཡོད། (two)
+      highlight: ''
+      options:
+      - གཉིས
+      - ཉི་མ
+      - ཞོ
+      - ཁྱི
+      answer: 0
+  default:
+    tibetan_title: ཉིན་ལྟར་གྱི་ཚིག་གྲོགས།
+    focus: ང་། ཁྱེད་རང་། ཡིན། ཡོད། སོགས་གཞི་རྩའི་ཚིག
+    level: འགོ་འཛུགས།
+    minutes: 10
+    words:
+    - tibetan: ང
+      wylie: nga
+      english: I / me
+      example: ང་སློབ་ཕྲུག་ཡིན།
+      example_en: I am a student.
+    - tibetan: ཁྱེད་རང
+      wylie: khyed rang
+      english: you (polite)
+      example: ཁྱེད་རང་དགེ་རྒན་ཡིན་པས།
+      example_en: Are you a teacher?
+    - tibetan: འདི
+      wylie: di
+      english: this
+      example: འདི་དེབ་ཡིན།
+      example_en: This is a book.
+    - tibetan: དེ
+      wylie: de
+      english: that
+      example: དེ་སྨྱུག་གུ་ཡིན།
+      example_en: That is a pen.
+    - tibetan: ཡིན
+      wylie: yin
+      english: is / am
+      example: ང་བུ་ཡིན།
+      example_en: I am a boy.
+    - tibetan: ཡོད
+      wylie: yod
+      english: have / exist
+      example: ང་ལ་དེབ་ཡོད།
+      example_en: I have a book.
+    dialogue:
+    - speaker: A
+      tibetan: ཁྱེད་རང་སུ་ཡིན།
+      wylie: khyed rang su yin
+      english: Who are you?
+    - speaker: B
+      tibetan: ང་སློབ་ཕྲུག་ཡིན། ཁྱེད་རང་སུ་ཡིན།
+      wylie: nga slob phrug yin. khyed rang su yin
+      english: I am a student. Who are you?
+    - speaker: A
+      tibetan: ང་དགེ་རྒན་ཡིན། འདི་ག་རེ་ཡིན།
+      wylie: nga dge rgan yin. 'di ga re yin
+      english: I am a teacher. What is this?
+    - speaker: B
+      tibetan: འདི་དེབ་ཡིན། དེ་སྨྱུག་གུ་ཡིན།
+      wylie: '''di deb yin. de smyug gu yin'
+      english: This is a book. That is a pen.
+    - speaker: A
+      tibetan: ཁྱེད་རང་ལ་དེབ་ཡོད་དམ།
+      wylie: khyed rang la deb yod dam
+      english: Do you have a book?
+    - speaker: B
+      tibetan: ལགས་སོ། ང་ལ་དེབ་ཡོད།
+      wylie: lags so. nga la deb yod
+      english: Yes. I have a book.
+    notes: ཡིན་ནི་ངོ་བོ་སྟོན་པའི་ཚིག་གྲོགས་ཡིན། དཔེར་ན་ང་སློབ་ཕྲུག་ཡིན། ཡོད་ནི་ཡོད་པ་སམ་འཆང་བ་སྟོན། དཔེར་ན་ང་ལ་དེབ་ཡོད།
+      འདི་ནི་ཉེ་བ། དེ་ནི་ཐག་རིང་བ་ལ་གོ། ཁྱེད་རང་ནི་ཞེ་སའི་ཁྱོད་ཡིན།
+    quiz:
+    - q: ང གི་དོན་གང་ཡིན།
+      highlight: ང
+      options:
+      - you
+      - I / me
+      - this
+      - that
+      answer: 1
+    - q: ཡོད གི་དོན་གང་ཡིན།
+      highlight: ཡོད
+      options:
+      - is / am
+      - have / exist
+      - 'no'
+      - go
+      answer: 1
+    - q: ______་དེབ་ཡིན། (this)
+      highlight: ''
+      options:
+      - འདི
+      - ཁྱི
+      - ཉི་མ
+      - ཐུག་པ
+      answer: 0

@@ -1,10 +1,12 @@
 /**
- * Vocab Rain — vocabulary typing game.
- * Melong generates the word pack; words fall; type English meaning.
+ * Vocab Rain — multi-mode falling-word game.
+ * Monlam typing: falling Tibetan and keyboard input must be identical.
+ * Meaning mode: falling Tibetan, type English.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../api/client'
 import { playFanfare, playLose, playWin, unlockAudio } from '../lib/gameSfx'
+import { localVocabPack } from '../lib/vocabRainFallback'
 import { useTibetanVoice } from '../hooks/useTibetanVoice'
 import VoicePicker from '../components/VoicePicker'
 import { bo } from '../i18n/bo'
@@ -15,8 +17,23 @@ const THEMES = [
   { id: 'family', labelKey: 'partyThemeFamily', glyph: 'ཨ་མ' },
   { id: 'nature', labelKey: 'partyThemeNature', glyph: 'ཉི་མ' },
   { id: 'food', labelKey: 'partyThemeFood', glyph: 'ཇ' },
-  { id: 'greetings', labelKey: 'partyThemeGreetings', glyph: 'བཀྲ་ཤིས' },
+  { id: 'greetings', labelKey: 'partyThemeGreetings', glyph: 'བཀྲ་ཤིས་བདེ་ལེགས།' },
   { id: 'numbers', labelKey: 'partyThemeNumbers', glyph: 'གསུམ' },
+]
+
+const GAME_MODES = [
+  {
+    id: 'meaning',
+    titleKey: 'partyModeMeaning',
+    subKey: 'partyModeMeaningSub',
+    glyph: 'A',
+  },
+  {
+    id: 'monlam',
+    titleKey: 'partyModeMonlam',
+    subKey: 'partyModeMonlamSub',
+    glyph: 'ཀ',
+  },
 ]
 
 const BALLOON_COLORS = ['#1a6b76', '#c47a16', '#2a9d8f', '#e9c46a', '#f4a261', '#0d3d45']
@@ -27,7 +44,7 @@ const FLOOR = 88
 const PACK_SIZE = 28
 const REFILL_AT = 6
 
-function normalize(s) {
+function normalizeEn(s) {
   return String(s || '')
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, ' ')
@@ -35,17 +52,57 @@ function normalize(s) {
     .trim()
 }
 
-function answersFor(word) {
-  if (Array.isArray(word?.answers) && word.answers.length) {
-    return [...new Set(word.answers.map(normalize).filter(Boolean))]
+/** Normalize Tibetan for identical compare (Monlam typing). */
+function normalizeBo(s) {
+  return String(s || '')
+    .normalize('NFC')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/[་།\s]/g, '')
+    .trim()
+}
+
+function englishAnswers(word) {
+  // Always merge english / wylie / answers — never rely on answers alone
+  // (Melong sometimes returns incomplete or non-Latin answers arrays).
+  const bag = []
+  if (Array.isArray(word?.answers)) bag.push(...word.answers)
+  if (word?.english) {
+    bag.push(word.english)
+    for (const part of String(word.english).split(/[/|,;]/)) bag.push(part)
   }
-  const parts = String(word?.english || '')
-    .split(/[/|,]/)
-    .map((p) => normalize(p))
-    .filter(Boolean)
-  const full = normalize(word?.english)
-  const wylie = normalize(word?.wylie)
-  return [...new Set([...parts, full, wylie].filter(Boolean))]
+  if (word?.wylie) bag.push(word.wylie)
+  return [...new Set(bag.map(normalizeEn).filter(Boolean))]
+}
+
+function tibetanAnswers(word) {
+  const raw = [word?.tibetan, ...(Array.isArray(word?.tibetan_answers) ? word.tibetan_answers : [])]
+  const out = []
+  for (const item of raw) {
+    if (!item) continue
+    const n = normalizeBo(item)
+    if (n) out.push(n)
+    // Also accept with/without a single trailing syllable mark already stripped above
+  }
+  return [...new Set(out)]
+}
+
+function isMatch(typed, word, mode) {
+  if (!word) return false
+  if (mode === 'monlam') {
+    const t = normalizeBo(typed)
+    if (!t) return false
+    return tibetanAnswers(word).includes(t)
+  }
+  const t = normalizeEn(typed)
+  if (!t) return false
+  const answers = englishAnswers(word)
+  if (answers.includes(t)) return true
+  // Allow typing one word from a multi-word gloss ("hello / blessings" → "hello")
+  return answers.some((a) => a.split(' ').includes(t) && t.length >= 2)
+}
+
+function hasTypedContent(typed, mode) {
+  return mode === 'monlam' ? Boolean(normalizeBo(typed)) : Boolean(normalizeEn(typed))
 }
 
 function pickWord(pool, usedIds, avoidId) {
@@ -79,9 +136,14 @@ function makeConfetti(n = 28) {
   }))
 }
 
+function bestKey(mode) {
+  return `mr_vocab_rain_best_${mode || 'meaning'}`
+}
+
 export default function LetterParty() {
   const { voice, setVoice, speak } = useTibetanVoice()
   const [phase, setPhase] = useState('lobby') // lobby | loading | play | over
+  const [mode, setMode] = useState('meaning')
   const [theme, setTheme] = useState('animals')
   const [pool, setPool] = useState([])
   const [source, setSource] = useState('ai')
@@ -90,7 +152,7 @@ export default function LetterParty() {
   const [y, setY] = useState(0)
   const [speed, setSpeed] = useState(START_SPEED)
   const [score, setScore] = useState(0)
-  const [best, setBest] = useState(() => Number(localStorage.getItem('mr_vocab_rain_best') || 0))
+  const [best, setBest] = useState(() => Number(localStorage.getItem(bestKey('meaning')) || 0))
   const [input, setInput] = useState('')
   const [balloons, setBalloons] = useState([])
   const [confetti, setConfetti] = useState([])
@@ -102,7 +164,9 @@ export default function LetterParty() {
   const poolRef = useRef([])
   const usedRef = useRef(new Set())
   const refillBusyRef = useRef(false)
+  const composingRef = useRef(false)
   const themeRef = useRef(theme)
+  const modeRef = useRef(mode)
   const speedRef = useRef(START_SPEED)
   const yRef = useRef(0)
   const scoreRef = useRef(0)
@@ -113,22 +177,21 @@ export default function LetterParty() {
   useEffect(() => {
     phaseRef.current = phase
   }, [phase])
-
   useEffect(() => {
     wordRef.current = word
   }, [word])
-
   useEffect(() => {
     speedRef.current = speed
   }, [speed])
-
   useEffect(() => {
     poolRef.current = pool
   }, [pool])
-
   useEffect(() => {
     themeRef.current = theme
   }, [theme])
+  useEffect(() => {
+    modeRef.current = mode
+  }, [mode])
 
   const clearFx = useCallback(() => {
     setBalloons([])
@@ -157,7 +220,7 @@ export default function LetterParty() {
     window.setTimeout(() => setShake(false), 500)
     setBest((b) => {
       const next = Math.max(b, scoreRef.current)
-      localStorage.setItem('mr_vocab_rain_best', String(next))
+      localStorage.setItem(bestKey(modeRef.current), String(next))
       return next
     })
   }, [])
@@ -169,7 +232,12 @@ export default function LetterParty() {
     refillBusyRef.current = true
     try {
       const exclude = poolRef.current.map((w) => w.tibetan).slice(-40)
-      const pack = await api.generateVocabRain(themeRef.current, PACK_SIZE, 'easy', exclude)
+      let pack
+      try {
+        pack = await api.generateVocabRain(themeRef.current, PACK_SIZE, 'easy', exclude)
+      } catch {
+        pack = localVocabPack(themeRef.current, PACK_SIZE, exclude)
+      }
       const incoming = Array.isArray(pack.words) ? pack.words : []
       if (!incoming.length) return
       const have = new Set(poolRef.current.map((w) => w.tibetan))
@@ -182,8 +250,9 @@ export default function LetterParty() {
       poolRef.current = merged
       setPool(merged)
       if (pack.source === 'ai') setSource('ai')
+      else if (pack.source === 'fallback') setSource('fallback')
     } catch {
-      /* keep playing with current pool */
+      /* keep current pool */
     } finally {
       refillBusyRef.current = false
     }
@@ -214,15 +283,18 @@ export default function LetterParty() {
   )
 
   const beginPlay = useCallback(
-    (words, themeId, packSource) => {
+    (words, themeId, packSource, playMode) => {
       setPool(words)
       poolRef.current = words
       usedRef.current = new Set()
       setSource(packSource || 'ai')
       setTheme(themeId)
       themeRef.current = themeId
+      setMode(playMode)
+      modeRef.current = playMode
       scoreRef.current = 0
       setScore(0)
+      setBest(Number(localStorage.getItem(bestKey(playMode)) || 0))
       setInput('')
       setShake(false)
       clearFx()
@@ -236,21 +308,37 @@ export default function LetterParty() {
     [clearFx, spawn],
   )
 
-  const start = async (themeId) => {
+  const start = async (themeId, playMode = mode) => {
     unlockAudio()
     setLoadError('')
     setTheme(themeId)
+    setMode(playMode)
+    modeRef.current = playMode
     phaseRef.current = 'loading'
     setPhase('loading')
     try {
-      const pack = await api.generateVocabRain(themeId, PACK_SIZE, 'easy', [])
+      let pack
+      try {
+        pack = await api.generateVocabRain(themeId, PACK_SIZE, 'easy', [])
+      } catch {
+        pack = localVocabPack(themeId, PACK_SIZE, [])
+      }
       const words = Array.isArray(pack.words) ? pack.words : []
-      if (!words.length) throw new Error(bo.modules.partyLoadEmpty)
-      beginPlay(words, themeId, pack.source || 'ai')
+      const finalPack =
+        words.length >= 8 ? pack : localVocabPack(themeId, PACK_SIZE, [])
+      const finalWords = Array.isArray(finalPack.words) ? finalPack.words : []
+      if (!finalWords.length) throw new Error(bo.modules.partyLoadEmpty)
+      beginPlay(finalWords, themeId, finalPack.source || 'fallback', playMode)
     } catch (err) {
-      setLoadError(err.message || bo.modules.partyLoadFail)
-      phaseRef.current = 'lobby'
-      setPhase('lobby')
+      // Absolute last resort — should almost never hit
+      const pack = localVocabPack(themeId, PACK_SIZE, [])
+      if (pack.words?.length) {
+        beginPlay(pack.words, themeId, 'fallback', playMode)
+      } else {
+        setLoadError(err.message || bo.modules.partyLoadFail)
+        phaseRef.current = 'lobby'
+        setPhase('lobby')
+      }
     }
   }
 
@@ -260,7 +348,6 @@ export default function LetterParty() {
       lastTsRef.current = 0
       return undefined
     }
-
     const tick = (ts) => {
       if (phaseRef.current !== 'play') return
       if (!lastTsRef.current) lastTsRef.current = ts
@@ -279,12 +366,9 @@ export default function LetterParty() {
     return () => cancelAnimationFrame(rafRef.current)
   }, [phase, gameOver])
 
-  const tryMatch = (raw) => {
+  const tryMatch = useCallback((raw) => {
     if (phaseRef.current !== 'play' || !wordRef.current) return false
-    const typed = normalize(raw)
-    if (!typed) return false
-    const ok = answersFor(wordRef.current).some((a) => a === typed)
-    if (!ok) return false
+    if (!isMatch(raw, wordRef.current, modeRef.current)) return false
 
     const nextScore = scoreRef.current + 1
     scoreRef.current = nextScore
@@ -293,21 +377,77 @@ export default function LetterParty() {
     const nextSpeed = Math.min(MAX_SPEED, speedRef.current + SPEED_STEP)
     spawn(wordRef.current.id, nextSpeed)
     return true
+  }, [celebrate, spawn])
+
+  const commitTyped = useCallback(() => {
+    if (phaseRef.current !== 'play') return
+    unlockAudio()
+    composingRef.current = false
+    const raw = inputRef.current?.value ?? ''
+    setInput(raw)
+    if (!hasTypedContent(raw, modeRef.current)) return
+    if (tryMatch(raw)) return
+    gameOver()
+  }, [tryMatch, gameOver])
+
+  /** Flush IME → then judge. Monlam needs a short delay so the glyph is in the DOM. */
+  const flushAndCommit = useCallback(
+    (delayMs = 0) => {
+      window.setTimeout(() => {
+        if (phaseRef.current !== 'play') return
+        const raw = inputRef.current?.value ?? ''
+        setInput(raw)
+        // Still empty after Monlam confirm — wait once more for compositionend
+        if (modeRef.current === 'monlam' && !hasTypedContent(raw, 'monlam')) {
+          window.setTimeout(() => commitTyped(), 80)
+          return
+        }
+        commitTyped()
+      }, delayMs)
+    },
+    [commitTyped],
+  )
+
+  const onCompositionStart = () => {
+    composingRef.current = true
+  }
+
+  const onCompositionEnd = (e) => {
+    composingRef.current = false
+    const v = e.target.value
+    setInput(v)
+    // Auto-clear when the finished glyph(s) already match the falling word
+    window.setTimeout(() => {
+      tryMatch(inputRef.current?.value ?? v)
+    }, 0)
   }
 
   const onInput = (e) => {
     const v = e.target.value
     setInput(v)
+    if (composingRef.current || e.nativeEvent?.isComposing) return
     tryMatch(v)
+  }
+
+  const onKeyDown = (e) => {
+    if (e.key !== 'Enter') return
+
+    // Monlam: first Enter often finishes the IME syllable — don't judge yet.
+    // (Avoid keyCode 229 alone; some browsers keep it set and block all Enter.)
+    if (modeRef.current === 'monlam' && (e.nativeEvent.isComposing || composingRef.current)) {
+      return
+    }
+
+    // Meaning mode, or Monlam after the glyph is committed: submit / judge
+    e.preventDefault()
+    flushAndCommit(modeRef.current === 'monlam' ? 50 : 0)
   }
 
   const onSubmit = (e) => {
     e.preventDefault()
-    if (phase !== 'play') return
-    unlockAudio()
-    if (!normalize(input)) return
-    if (tryMatch(input)) return
-    gameOver()
+    // Clicking འགྲོ། / Enter that bubbled as submit
+    if (modeRef.current === 'monlam' && composingRef.current) return
+    flushAndCommit(modeRef.current === 'monlam' ? 40 : 0)
   }
 
   const themeLabel = (id) => {
@@ -315,7 +455,17 @@ export default function LetterParty() {
     return t ? bo.modules[t.labelKey] : id
   }
 
-  const hintAnswers = useMemo(() => (word ? answersFor(word) : []), [word])
+  const modeLabel = (id) => {
+    const m = GAME_MODES.find((x) => x.id === id)
+    return m ? bo.modules[m.titleKey] : id
+  }
+
+  const fallingText = word?.tibetan || ''
+  const overAnswer =
+    mode === 'monlam' ? word?.tibetan : englishAnswers(word || {})[0] || word?.english
+
+  const typeHint = mode === 'monlam' ? bo.modules.partyTypeHintBo : bo.modules.partyTypeHint
+  const placeholder = mode === 'monlam' ? 'ཁྱི' : 'water, dog, mother…'
 
   return (
     <div
@@ -372,10 +522,29 @@ export default function LetterParty() {
 
           <div className="rain-lobby-body">
             <div className="rain-lobby-tools">
-              <p className="rain-pick">{bo.modules.partyPickLevel}</p>
+              <p className="rain-pick">{bo.modules.partyPickMode}</p>
               <VoicePicker value={voice} onChange={setVoice} />
             </div>
             <p className="rain-how">{bo.modules.partyAiNote}</p>
+
+            <div className="rain-mode-row">
+              {GAME_MODES.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  className={'rain-mode-btn' + (mode === m.id ? ' is-active' : '')}
+                  onClick={() => setMode(m.id)}
+                >
+                  <span className={'rain-mode-glyph' + (m.id === 'monlam' ? ' tibetan' : '')}>
+                    {m.glyph}
+                  </span>
+                  <strong>{bo.modules[m.titleKey]}</strong>
+                  <span>{bo.modules[m.subKey]}</span>
+                </button>
+              ))}
+            </div>
+
+            <p className="rain-pick rain-pick-theme">{bo.modules.partyPickLevel}</p>
             {loadError && <p className="error">{loadError}</p>}
 
             {phase === 'loading' ? (
@@ -390,7 +559,7 @@ export default function LetterParty() {
                     key={t.id}
                     type="button"
                     className="rain-theme-btn"
-                    onClick={() => start(t.id)}
+                    onClick={() => start(t.id, mode)}
                   >
                     <span className="rain-theme-glyph tibetan">{t.glyph}</span>
                     <strong>{bo.modules[t.labelKey]}</strong>
@@ -427,6 +596,7 @@ export default function LetterParty() {
               </div>
             </div>
             <div className="rain-arena-meta">
+              <span>{modeLabel(mode)}</span>
               <span>{themeLabel(theme)}</span>
               <span dir="ltr">
                 {source === 'ai' ? bo.modules.partySourceAi : bo.modules.partySourceFallback}
@@ -450,7 +620,7 @@ export default function LetterParty() {
                 onClick={() => speak(word.tibetan)}
                 aria-label={bo.modules.listen}
               >
-                {word.tibetan}
+                {fallingText}
               </button>
             )}
 
@@ -458,14 +628,18 @@ export default function LetterParty() {
               <div className="rain-over">
                 <p className="rain-over-kicker">{bo.modules.partyOverTitle}</p>
                 <p className="rain-over-word tibetan">{word.tibetan}</p>
-                <p className="rain-over-answer" dir="ltr">
-                  {bo.modules.partyOverAnswer}: {hintAnswers[0] || word.english}
+                <p className={'rain-over-answer' + (mode === 'monlam' ? ' tibetan' : '')}>
+                  {bo.modules.partyOverAnswer}: {overAnswer}
                 </p>
                 <p className="rain-over-score" dir="ltr">
                   {score}
                 </p>
                 <div className="rain-over-actions">
-                  <button type="button" className="btn btn-primary" onClick={() => start(theme)}>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => start(theme, mode)}
+                  >
                     {bo.modules.partyPlayAgain}
                   </button>
                   <button
@@ -486,21 +660,28 @@ export default function LetterParty() {
           {phase === 'play' && (
             <form className="rain-typebar" onSubmit={onSubmit}>
               <label className="rain-type-label" htmlFor="rain-input">
-                {bo.modules.partyTypeHint}
+                {typeHint}
               </label>
               <div className="rain-type-row">
                 <input
                   id="rain-input"
                   ref={inputRef}
-                  className="rain-input"
-                  dir="ltr"
+                  className={'rain-input' + (mode === 'monlam' ? ' is-bo' : ' is-en')}
+                  lang={mode === 'monlam' ? 'bo' : 'en'}
+                  inputMode={mode === 'monlam' ? 'text' : 'latin'}
+                  enterKeyHint="done"
+                  dir={mode === 'monlam' ? 'auto' : 'ltr'}
                   autoComplete="off"
                   autoCapitalize="off"
                   autoCorrect="off"
                   spellCheck={false}
+                  // Meaning mode: default Latin keyboard. Monlam mode: use Monlam IME.
                   value={input}
                   onChange={onInput}
-                  placeholder="water, dog, mother…"
+                  onKeyDown={onKeyDown}
+                  onCompositionStart={mode === 'monlam' ? onCompositionStart : undefined}
+                  onCompositionEnd={mode === 'monlam' ? onCompositionEnd : undefined}
+                  placeholder={placeholder}
                 />
                 <button type="submit" className="btn btn-primary rain-go">
                   {bo.modules.partyGo}

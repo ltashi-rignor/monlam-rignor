@@ -1,16 +1,28 @@
 import LessonCard from './LessonCard'
+import { sameLessonId } from '../lib/lessonNav'
 import { bo } from '../i18n/bo'
 import { tibetanOrFallback } from '../i18n/labels'
 
-export default function Roadmap({ weeks, selectedId, onSelectLesson }) {
+function weekProgress(lessons) {
+  const total = lessons.length
+  if (!total) return { done: 0, total: 0, pct: 0 }
+  const completed = lessons.filter((l) => l.status === 'completed').length
+  const inProgress = lessons.filter((l) => l.status === 'in_progress').length
+  const weighted = completed + inProgress * 0.5
+  return {
+    done: completed,
+    total,
+    pct: Math.round((weighted / total) * 100),
+  }
+}
+
+export default function Roadmap({ weeks, selectedId, onSelectLesson, onOpenLesson }) {
   if (!weeks?.length) return <div className="empty tibetan">{bo.learningPath.noPlan}</div>
 
   return (
     <div className="tibetan roadmap-list">
       {weeks.map((week) => {
-        const done = week.lessons.filter((l) => l.status === 'completed').length
-        const total = week.lessons.length
-        const pct = total ? Math.round((done / total) * 100) : 0
+        const { done, total, pct } = weekProgress(week.lessons)
         const focus = tibetanOrFallback(week.focus, '')
         const goals = (week.goals || [])
           .map((g) => tibetanOrFallback(g, ''))
@@ -41,7 +53,7 @@ export default function Roadmap({ weeks, selectedId, onSelectLesson }) {
               </ul>
             )}
             <div className="grid-3">
-              {week.lessons.map((lesson) => (
+              {week.lessons.map((lesson, i) => (
                 <LessonCard
                   key={lesson.id || `${week.week_number}-${lesson.order_index}`}
                   title={tibetanOrFallback(lesson.title, bo.common.lesson)}
@@ -49,8 +61,10 @@ export default function Roadmap({ weeks, selectedId, onSelectLesson }) {
                   weekNumber={week.week_number}
                   status={lesson.status || 'pending'}
                   content={tibetanOrFallback(lesson.content || lesson.description, '')}
-                  selected={selectedId === lesson.id}
-                  onClick={lesson.id ? () => onSelectLesson(lesson) : undefined}
+                  selected={sameLessonId(selectedId, lesson.id)}
+                  onClick={() => onSelectLesson(lesson)}
+                  onOpen={onOpenLesson ? () => onOpenLesson(lesson) : undefined}
+                  index={i}
                 />
               ))}
             </div>
