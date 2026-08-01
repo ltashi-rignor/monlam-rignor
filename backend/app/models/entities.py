@@ -29,12 +29,17 @@ class User(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
+    username: Mapped[str | None] = mapped_column(String(64), unique=True, index=True, nullable=True)
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     age: Mapped[int | None] = mapped_column(Integer, nullable=True)
     school_class: Mapped[str | None] = mapped_column(String(100), nullable=True)
     likes: Mapped[str | None] = mapped_column(Text, nullable=True)
     favorites: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Legacy fields retained for existing rows; no longer required for profile_complete
+    # Rich AI learner profile (goals, ability, interests, prefs, placement, …)
+    learner_profile: Mapped[dict] = mapped_column(JSONB, default=dict)
+    # Legacy fields retained for existing rows; synced from learner_profile when possible
     native_language: Mapped[str | None] = mapped_column(String(100), nullable=True)
     current_level: Mapped[str | None] = mapped_column(String(50), nullable=True)
     goal: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -64,7 +69,7 @@ class EmailOTP(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     email: Mapped[str] = mapped_column(String(320), index=True)
-    code: Mapped[str] = mapped_column(String(10))
+    code: Mapped[str] = mapped_column(String(128))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     used: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(
@@ -336,6 +341,25 @@ class CmsContactMessage(Base):
     email: Mapped[str] = mapped_column(String(320))
     subject: Mapped[str | None] = mapped_column(String(400), nullable=True)
     message: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class RefreshToken(Base):
+    """Hashed refresh tokens for short-lived access JWTs."""
+
+    __tablename__ = "refresh_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    revoked: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

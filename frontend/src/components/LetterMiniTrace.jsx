@@ -4,13 +4,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import traceDoc from '../data/tibetanTraceLetters.json'
 import { normalizeDoc, normalizeBrush, TraceEngine } from '../lib/traceCore'
-import { bo } from '../i18n/bo'
+import { useI18n } from '../i18n/useI18n'
 
 const TRACE_LETTERS = normalizeDoc(traceDoc)
 const TRACE_BRUSH = normalizeBrush(traceDoc.brush)
 const BY_GLYPH = Object.fromEntries(TRACE_LETTERS.map((L) => [L.glyph, L]))
 
 export default function LetterMiniTrace({ glyph, onComplete }) {
+  const { t } = useI18n()
+
   const canvasRef = useRef(null)
   const wrapRef = useRef(null)
   const engineRef = useRef(null)
@@ -98,7 +100,7 @@ export default function LetterMiniTrace({ glyph, onComplete }) {
   }, [glyph, traceLetter, fit])
 
   if (!traceLetter) {
-    return <p className="muted">{bo.modules.alphaNoTrace}</p>
+    return <p className="muted">{t.modules.alphaNoTrace}</p>
   }
 
   return (
@@ -127,7 +129,7 @@ export default function LetterMiniTrace({ glyph, onComplete }) {
             engineRef.current?.reset()
           }}
         >
-          {bo.modules.alphaRetryTrace}
+          {t.modules.alphaRetryTrace}
         </button>
         <button
           type="button"
@@ -137,7 +139,7 @@ export default function LetterMiniTrace({ glyph, onComplete }) {
             engineRef.current?.demo()
           }}
         >
-          {bo.modules.alphaWatchDemo}
+          {t.modules.alphaWatchDemo}
         </button>
       </div>
     </div>

@@ -24,7 +24,13 @@ export function useI18n() {
   const setLang = useLocaleStore((s) => s.setLang)
   const toggleLang = useLocaleStore((s) => s.toggleLang)
 
-  const t = useMemo(() => (lang === 'en' ? mergeDict(bo, en) : bo), [lang])
+  // Always deep-merge so Tibetan chrome can fall back to English option catalogs
+  // (and English can fall back to Tibetan for any missing keys).
+  //
+  // IMPORTANT: never shadow `t` in .map/.find callbacks inside components that
+  // call useI18n — e.g. use .map((item) => …) not .map((t) => …). That caused
+  // "Cannot read properties of undefined (reading 'topicParticles')" crashes.
+  const t = useMemo(() => (lang === 'en' ? mergeDict(bo, en) : mergeDict(en, bo)), [lang])
 
   return { t, lang, setLang, toggleLang, isEn: lang === 'en' }
 }

@@ -3,7 +3,7 @@ import { api } from '../api/client'
 import VoicePicker from '../components/VoicePicker'
 import { FILLER_BANK, useTibetanVoice } from '../hooks/useTibetanVoice'
 import { unlockAudio } from '../lib/gameSfx'
-import { bo } from '../i18n/bo'
+import { useI18n } from '../i18n/useI18n'
 
 const STARTERS = [
   'བཀྲ་ཤིས་བདེ་ལེགས།',
@@ -35,7 +35,7 @@ function pickRecorderMime() {
     'audio/mp4',
     'audio/ogg',
   ]
-  return candidates.find((t) => MediaRecorder.isTypeSupported(t)) || ''
+  return candidates.find((mime) => MediaRecorder.isTypeSupported(mime)) || ''
 }
 
 function stripBo(s) {
@@ -61,6 +61,8 @@ function isEchoOrNoise(transcript, lastAssistant) {
 }
 
 export default function Tutor() {
+  const { t } = useI18n()
+
   const [tab, setTab] = useState('text')
   const [messages, setMessages] = useState([{ role: 'assistant', content: GREETING }])
   const [input, setInput] = useState('')
@@ -124,7 +126,7 @@ export default function Tutor() {
     }
     recorderRef.current = null
     chunksRef.current = []
-    mediaRef.current?.getTracks().forEach((t) => t.stop())
+    mediaRef.current?.getTracks().forEach((track) => track.stop())
     mediaRef.current = null
     listeningRef.current = false
     setLevel(0)
@@ -155,8 +157,8 @@ export default function Tutor() {
     }
     const Ctx = window.AudioContext || window.webkitAudioContext
     if (!Ctx) {
-      const t = window.setTimeout(() => onSilenceEnd(), MAX_LISTEN_MS)
-      vadCleanupRef.current = () => window.clearTimeout(t)
+      const timeoutId = window.setTimeout(() => onSilenceEnd(), MAX_LISTEN_MS)
+      vadCleanupRef.current = () => window.clearTimeout(timeoutId)
       return
     }
     const ctx = new Ctx()
@@ -265,7 +267,7 @@ export default function Tutor() {
 
       noteWaitMs(performance.now() - waitStarted)
       const reply = (data.reply || '').trim()
-      if (!reply) throw new Error(bo.modules.tutorSttFail)
+      if (!reply) throw new Error(t.modules.tutorSttFail)
       voiceHistoryRef.current = [...next, { role: 'assistant', content: reply }]
       setPhase('speaking')
       const finished = await speak(reply, { crossfadeFiller: true })
@@ -399,7 +401,7 @@ export default function Tutor() {
         },
       })
       if (gen !== turnGenRef.current) {
-        stream.getTracks().forEach((t) => t.stop())
+        stream.getTracks().forEach((track) => track.stop())
         return
       }
       mediaRef.current = stream
@@ -441,14 +443,14 @@ export default function Tutor() {
   }
 
   const statusText = !inCall
-    ? bo.modules.tutorCallStart
+    ? t.modules.tutorCallStart
     : voicePhase === 'listening'
-      ? bo.modules.tutorListening
+      ? t.modules.tutorListening
       : voicePhase === 'processing'
-        ? bo.modules.tutorProcessing
+        ? t.modules.tutorProcessing
         : voicePhase === 'speaking'
-          ? bo.modules.tutorSpeaking
-          : bo.modules.tutorCallReady
+          ? t.modules.tutorSpeaking
+          : t.modules.tutorCallReady
 
   const orbScale = 1 + level * 0.35
 
@@ -456,10 +458,10 @@ export default function Tutor() {
     <div className="module-page tutor-page tibetan">
       <header className="page-header tutor-hero">
         <div>
-          <p className="module-eyebrow">{bo.modules.tutorEyebrow}</p>
-          <h1>{bo.modules.tutorTitle}</h1>
-          {tab === 'text' && <p>{bo.modules.tutorSub}</p>}
-          {tab === 'voice' && <p className="tutor-voice-sub">{bo.modules.tutorVoiceSub}</p>}
+          <p className="module-eyebrow">{t.modules.tutorEyebrow}</p>
+          <h1>{t.modules.tutorTitle}</h1>
+          {tab === 'text' && <p>{t.modules.tutorSub}</p>}
+          {tab === 'voice' && <p className="tutor-voice-sub">{t.modules.tutorVoiceSub}</p>}
         </div>
         {tab === 'voice' && <VoicePicker value={voice} onChange={setVoice} />}
       </header>
@@ -475,7 +477,7 @@ export default function Tutor() {
             setTab('text')
           }}
         >
-          {bo.modules.tutorTabText}
+          {t.modules.tutorTabText}
         </button>
         <button
           type="button"
@@ -484,7 +486,7 @@ export default function Tutor() {
           className={`tutor-tab ${tab === 'voice' ? 'is-active' : ''}`}
           onClick={() => setTab('voice')}
         >
-          {bo.modules.tutorTabVoice}
+          {t.modules.tutorTabVoice}
         </button>
       </div>
 
@@ -497,7 +499,7 @@ export default function Tutor() {
                 <div className="tutor-bubble-wrap">
                   <div className="tutor-bubble tibetan">{m.content}</div>
                   {m.role === 'assistant' && m.usedRag && (
-                    <p className="tutor-rag-note muted">{bo.modules.tutorFromHandbook}</p>
+                    <p className="tutor-rag-note muted">{t.modules.tutorFromHandbook}</p>
                   )}
                 </div>
               </div>
@@ -505,7 +507,7 @@ export default function Tutor() {
             {busy && (
               <div className="tutor-msg is-ai">
                 <div className="tutor-avatar">བློ།</div>
-                <div className="tutor-bubble muted">{bo.modules.thinking}</div>
+                <div className="tutor-bubble muted">{t.modules.thinking}</div>
               </div>
             )}
             {err && <p className="error">{err}</p>}
@@ -531,10 +533,10 @@ export default function Tutor() {
               className="tibetan"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={bo.modules.tutorPh}
+              placeholder={t.modules.tutorPh}
             />
             <button className="btn btn-primary" disabled={busy || !input.trim()}>
-              {bo.modules.send}
+              {t.modules.send}
             </button>
           </form>
         </div>
@@ -548,7 +550,7 @@ export default function Tutor() {
           aria-live="polite"
         >
           {!micSupported ? (
-            <p className="muted">{bo.modules.tutorMicUnsupported}</p>
+            <p className="muted">{t.modules.tutorMicUnsupported}</p>
           ) : (
             <>
               <div
@@ -588,14 +590,14 @@ export default function Tutor() {
               </button>
               {inCall && (
                 <button type="button" className="tutor-hangup" onClick={endCall}>
-                  {bo.modules.tutorCallEnd}
+                  {t.modules.tutorCallEnd}
                 </button>
               )}
               {inCall && voicePhase === 'speaking' && (
-                <p className="tutor-voice-hint muted">{bo.modules.tutorBargeHint}</p>
+                <p className="tutor-voice-hint muted">{t.modules.tutorBargeHint}</p>
               )}
               {inCall && voicePhase === 'listening' && (
-                <p className="tutor-voice-hint muted">{bo.modules.tutorSilenceHint}</p>
+                <p className="tutor-voice-hint muted">{t.modules.tutorSilenceHint}</p>
               )}
             </>
           )}

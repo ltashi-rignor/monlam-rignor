@@ -7,9 +7,10 @@ import re
 from typing import Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from app.core.rate_limit import rate_limit_llm
 from app.core.security import get_current_user_id
 from app.content.loader import load_yaml
 from app.services.llm import get_llm, melong_is_rate_limited
@@ -198,7 +199,7 @@ def _fallback_words(theme: str, count: int, exclude: set[str] | None = None) -> 
     return out
 
 
-def _ask_melong(theme: str, topic: str, level: str, count: int, exclude: list[str]) -> list[VocabWordOut]:
+async def _ask_melong(theme: str, topic: str, level: str, count: int, exclude: list[str]) -> list[VocabWordOut]:
     if melong_is_rate_limited():
         raise HTTPException(
             status_code=502,
@@ -225,15 +226,17 @@ def _ask_melong(theme: str, topic: str, level: str, count: int, exclude: list[st
         '{"tibetan":"ཆུ","english":"water","wylie":"chu","answers":["water"]}'
     )
     llm = get_llm()
-    data = llm.complete_json(system, user, max_tokens=4096, temperature=0.85, retries=0)
+    data = await llm.complete_json_async(system, user, max_tokens=4096, temperature=0.85, retries=0)
     return _normalize_words(data, theme, count, exclude=set(exclude))
 
 
 @router.post("/vocab-rain", response_model=VocabRainOut)
-def generate_vocab_rain(
+async def generate_vocab_rain(
     body: VocabRainIn,
+    request: Request,
     _user_id: UUID = Depends(get_current_user_id),
 ):
+    rate_limit_llm(request, str(_user_id))
     theme = body.theme if body.theme in THEMES or body.theme == "all" else "animals"
     topic = THEMES.get(theme, THEMES["animals"])
     level = (
@@ -250,12 +253,12 @@ def generate_vocab_rain(
     # When Melong is known-down, skip the wait and serve offline packs immediately.
     if not melong_is_rate_limited():
         try:
-            batch = _ask_melong(theme, topic, level, want, exclude)
+            batch = await _ask_melong(theme, topic, level, want, exclude)
             words.extend(batch)
             source = "ai"
             if len(words) < max(12, want // 2):
                 more_exclude = exclude + [w.tibetan for w in words]
-                extra = _ask_melong(theme, topic, level, want, more_exclude)
+                extra = await _ask_melong(theme, topic, level, want, more_exclude)
                 seen = {w.tibetan for w in words}
                 for w in extra:
                     if w.tibetan in seen:

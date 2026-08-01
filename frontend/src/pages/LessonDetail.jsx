@@ -4,8 +4,9 @@ import { api, clearApiCache } from '../api/client'
 import { useModuleProgress } from '../hooks/useModuleProgress'
 import { useTibetanVoice } from '../hooks/useTibetanVoice'
 import VoicePicker from '../components/VoicePicker'
+import WorkingProgress from '../components/WorkingProgress'
 import { playFanfare, playLose, playWin, unlockAudio } from '../lib/gameSfx'
-import { bo } from '../i18n/bo'
+import { useI18n } from '../i18n/useI18n'
 import { tibetanOrFallback } from '../i18n/labels'
 
 const STEPS = ['intro', 'words', 'dialogue', 'notes', 'quiz', 'done']
@@ -86,6 +87,8 @@ function QuizPrompt({ text, highlight }) {
 }
 
 export default function LessonDetail() {
+  const { t } = useI18n()
+
   const { id } = useParams()
   const navigate = useNavigate()
   const { submitQuiz } = useModuleProgress()
@@ -131,7 +134,7 @@ export default function LessonDetail() {
     } catch (err) {
       const msg = err.message || ''
       if (/429|rate limit/i.test(msg)) {
-        setError(bo.modules.rateLimited)
+        setError(t.modules.rateLimited)
       } else {
         setError(msg)
       }
@@ -146,6 +149,34 @@ export default function LessonDetail() {
     load(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
+
+  // Bank lesson opens instantly; poll briefly for background Melong upgrade.
+  useEffect(() => {
+    if (!lesson?.offline || !id || regenBusy) return undefined
+    let cancelled = false
+    let tries = 0
+    const tick = async () => {
+      tries += 1
+      try {
+        const data = await api.getInteractiveLesson(id)
+        if (cancelled || !data) return
+        if (!data.offline) {
+          setLesson(data)
+          return
+        }
+      } catch {
+        /* keep bank lesson */
+      }
+      if (!cancelled && tries < 6) {
+        window.setTimeout(tick, 5000)
+      }
+    }
+    const timer = window.setTimeout(tick, 4000)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [lesson?.offline, lesson?.id, id, regenBusy])
 
   const words = useMemo(() => {
     if (!lesson?.words) return []
@@ -239,8 +270,16 @@ export default function LessonDetail() {
   if (loading) {
     return (
       <div className="empty panel tibetan lesson-loading">
-        <div className="lesson-shimmer" aria-hidden />
-        <p>{bo.modules.generatingLesson}</p>
+        <WorkingProgress
+          active
+          title={t.modules.lessonTitle || t.modules.generatingLesson}
+          stages={[
+            t.modules.lessonStage1,
+            t.modules.lessonStage2,
+            t.modules.lessonStage3,
+            t.modules.lessonStage4,
+          ]}
+        />
       </div>
     )
   }
@@ -248,13 +287,13 @@ export default function LessonDetail() {
   if (error || !lesson) {
     return (
       <div className="empty panel tibetan">
-        <p className="error">{error || bo.modules.lessonMissing}</p>
+        <p className="error">{error || t.modules.lessonMissing}</p>
         <div className="module-actions">
           <Link className="btn btn-ghost" to="/lessons">
-            {bo.modules.backLessons}
+            {t.modules.backLessons}
           </Link>
           <Link className="btn btn-primary" to="/learning-path">
-            {bo.modules.openPath}
+            {t.modules.openPath}
           </Link>
         </div>
       </div>
@@ -286,7 +325,7 @@ export default function LessonDetail() {
 
       <div className="page-header" style={{ marginBottom: 8 }}>
         <button type="button" className="btn btn-ghost" onClick={() => navigate('/lessons')}>
-          ← {bo.modules.backLessons}
+          ← {t.modules.backLessons}
         </button>
         <div className="lesson-top-tools">
           <VoicePicker value={voice} onChange={setVoice} />
@@ -299,7 +338,7 @@ export default function LessonDetail() {
               load(true)
             }}
           >
-            {regenBusy ? bo.modules.generatingLesson : bo.modules.regenLesson}
+            {regenBusy ? t.modules.generatingLesson : t.modules.regenLesson}
           </button>
         </div>
       </div>
@@ -307,13 +346,13 @@ export default function LessonDetail() {
       <header className="page-header lesson-play-hero" style={{ marginTop: 4 }}>
         <div>
           <p className="module-eyebrow">
-            {bo.learningPath.week} {lesson.week_number}
+            {t.learningPath.week} {lesson.week_number}
             {lesson.level ? ` · ${tibetanOrFallback(lesson.level, lesson.level)}` : ''} ·{' '}
             <span dir="ltr">{lesson.minutes} min</span>
           </p>
           <h1>{title}</h1>
           {focus && <p className="muted">{focus}</p>}
-          {lesson.offline && <p className="muted">{bo.modules.offlineLesson}</p>}
+          {lesson.offline && <p className="muted">{t.modules.offlineLesson}</p>}
         </div>
       </header>
 
@@ -333,7 +372,7 @@ export default function LessonDetail() {
               onClick={() => goToStep(s)}
             >
               <span className="step-rail-dot" />
-              <span className="step-rail-label">{bo.modules[STEP_LABELS[s]]}</span>
+              <span className="step-rail-label">{t.modules[STEP_LABELS[s]]}</span>
             </button>
           )
         })}
@@ -341,11 +380,11 @@ export default function LessonDetail() {
 
       {step === 'intro' && (
         <section className="panel lesson-step lesson-stage lesson-step-enter">
-          <div className="lesson-intro-badge">{bo.modules.wordsReady}</div>
+          <div className="lesson-intro-badge">{t.modules.wordsReady}</div>
           <p className="module-eyebrow">01</p>
-          <h2>{bo.modules.readyBegin}</h2>
+          <h2>{t.modules.readyBegin}</h2>
           <p className="lesson-intro-count">
-            <strong dir="ltr">{words.length}</strong> {bo.modules.wordsCount}
+            <strong dir="ltr">{words.length}</strong> {t.modules.wordsCount}
           </p>
           <button
             type="button"
@@ -355,7 +394,7 @@ export default function LessonDetail() {
               advance('words')
             }}
           >
-            {bo.modules.startLesson}
+            {t.modules.startLesson}
           </button>
         </section>
       )}
@@ -363,9 +402,9 @@ export default function LessonDetail() {
       {step === 'words' && (
         <section className="panel lesson-step lesson-step-enter">
           <p className="module-eyebrow">02</p>
-          <h2>{bo.modules.meetVocab}</h2>
+          <h2>{t.modules.meetVocab}</h2>
           <p className="muted">
-            {bo.modules.tapFlip} · {bo.modules.heard} {wordsHeard}/{words.length}
+            {t.modules.tapFlip} · {t.modules.heard} {wordsHeard}/{words.length}
           </p>
           <div className="flip-grid">
             {words.map((w) => {
@@ -375,7 +414,7 @@ export default function LessonDetail() {
                 <div key={w.id} className={`flip-card ${isFlip ? 'is-flipped' : ''} ${isHeard ? 'is-heard' : ''}`}>
                   <button type="button" className="flip-face flip-front" onClick={() => flipCard(w.id)}>
                     <span className="tibetan flip-bo">{w.tibetan}</span>
-                    <span className="muted flip-hint">{bo.modules.tapFlip}</span>
+                    <span className="muted flip-hint">{t.modules.tapFlip}</span>
                   </button>
                   <div className="flip-face flip-back">
                     <button type="button" className="flip-back-main" onClick={() => flipCard(w.id)}>
@@ -399,7 +438,7 @@ export default function LessonDetail() {
                       className="btn btn-accent flip-speak"
                       onClick={() => onSpeak(w.tibetan, w.id)}
                     >
-                      {bo.modules.tapSpeak}
+                      {t.modules.tapSpeak}
                     </button>
                   </div>
                 </div>
@@ -413,10 +452,10 @@ export default function LessonDetail() {
       {step === 'dialogue' && (
         <section className="panel lesson-step lesson-step-enter">
           <p className="module-eyebrow">03</p>
-          <h2>{bo.modules.readAlong}</h2>
+          <h2>{t.modules.readAlong}</h2>
           <div className="dialogue-play-head">
             <button type="button" className="btn btn-ghost" onClick={playDialogueAll}>
-              {bo.modules.playAllLines}
+              {t.modules.playAllLines}
             </button>
             <span className="meta" dir="ltr">
               {Math.min(dialogueIdx + 1, dialogue.length)}/{dialogue.length}
@@ -456,7 +495,7 @@ export default function LessonDetail() {
                         className="btn btn-ghost dialogue-en-btn"
                         onClick={() => setShowEn((s) => ({ ...s, [i]: true }))}
                       >
-                        {bo.modules.revealEnglish}
+                        {t.modules.revealEnglish}
                       </button>
                     )}
                   </div>
@@ -466,7 +505,7 @@ export default function LessonDetail() {
           </div>
           <div className="module-actions" style={{ marginTop: 20, justifyContent: 'space-between' }}>
             <button type="button" className="btn btn-ghost" onClick={prev}>
-              {bo.modules.back}
+              {t.modules.back}
             </button>
             {dialogueIdx < dialogue.length - 1 ? (
               <button
@@ -474,11 +513,11 @@ export default function LessonDetail() {
                 className="btn btn-primary"
                 onClick={() => setDialogueIdx((d) => d + 1)}
               >
-                {bo.modules.nextLine}
+                {t.modules.nextLine}
               </button>
             ) : (
               <button type="button" className="btn btn-primary" onClick={() => advance('notes')}>
-                {bo.modules.continue}
+                {t.modules.continue}
               </button>
             )}
           </div>
@@ -488,10 +527,10 @@ export default function LessonDetail() {
       {step === 'notes' && (
         <section className="panel lesson-step lesson-step-enter">
           <p className="module-eyebrow">04</p>
-          <h2>{bo.modules.closerLook}</h2>
-          <p className="muted">{bo.modules.tapReveal}</p>
+          <h2>{t.modules.closerLook}</h2>
+          <p className="muted">{t.modules.tapReveal}</p>
           <div className="notes-reveal-grid">
-            {(notesChunks.length ? notesChunks : [bo.modules.closerLook]).map((chunk, i) => {
+            {(notesChunks.length ? notesChunks : [t.modules.closerLook]).map((chunk, i) => {
               const on = revealedNotes[i]
               return (
                 <button
@@ -500,21 +539,21 @@ export default function LessonDetail() {
                   className={`notes-chip ${on ? 'is-on' : ''}`}
                   onClick={() => setRevealedNotes((r) => ({ ...r, [i]: true }))}
                 >
-                  {on ? chunk : bo.modules.tapReveal}
+                  {on ? chunk : t.modules.tapReveal}
                 </button>
               )
             })}
           </div>
-          <NavRow onPrev={prev} onNext={() => advance('quiz')} nextLabel={bo.modules.takeQuiz} />
+          <NavRow onPrev={prev} onNext={() => advance('quiz')} nextLabel={t.modules.takeQuiz} />
         </section>
       )}
 
       {step === 'quiz' && (
         <section className="panel lesson-step lesson-step-enter">
           <p className="module-eyebrow">05</p>
-          <h2>{bo.modules.checkUnderstanding}</h2>
+          <h2>{t.modules.checkUnderstanding}</h2>
           <p className="quiz-live-score">
-            {bo.modules.scoreLive}:{' '}
+            {t.modules.scoreLive}:{' '}
             <strong dir="ltr">
               {liveScore}/{quiz.length}
             </strong>
@@ -556,7 +595,7 @@ export default function LessonDetail() {
                   </div>
                   {isLocked && (
                     <p className={`quiz-feedback ${picked === q.answer ? 'ok' : 'bad'}`}>
-                      {picked === q.answer ? bo.modules.correct : bo.modules.tryAgain}
+                      {picked === q.answer ? t.modules.correct : t.modules.tryAgain}
                     </p>
                   )}
                 </div>
@@ -565,7 +604,7 @@ export default function LessonDetail() {
           </div>
           <div className="module-actions" style={{ marginTop: 20 }}>
             <button type="button" className="btn btn-ghost" onClick={prev}>
-              {bo.modules.back}
+              {t.modules.back}
             </button>
             <button
               type="button"
@@ -573,7 +612,7 @@ export default function LessonDetail() {
               disabled={!allQuizAnswered}
               onClick={onSubmitQuiz}
             >
-              {bo.modules.submitAnswers}
+              {t.modules.submitAnswers}
             </button>
           </div>
         </section>
@@ -582,8 +621,8 @@ export default function LessonDetail() {
       {step === 'done' && quizResult && (
         <section className="panel lesson-done lesson-step-enter">
           <div className="tibetan lesson-done-title">ལེགས་སོ།</div>
-          <h2>{bo.modules.wellDone}</h2>
-          <div className="lesson-stars" aria-label={bo.modules.stars}>
+          <h2>{t.modules.wellDone}</h2>
+          <div className="lesson-stars" aria-label={t.modules.stars}>
             {[0, 1, 2].map((i) => {
               const threshold = ((i + 1) / 3) * (quizResult.total || 1)
               const on = quizResult.score >= threshold
@@ -598,17 +637,17 @@ export default function LessonDetail() {
             {quizResult.score} / {quizResult.total} · +{quizResult.score * 10} XP
           </p>
           {quizResult.score >= Math.max(1, Math.floor((quizResult.total || 1) / 2)) && (
-            <p className="muted">{bo.learningPath.completed}</p>
+            <p className="muted">{t.learningPath.completed}</p>
           )}
           <div className="module-actions">
             <Link className="btn btn-ghost" to="/learning-path">
-              {bo.modules.openPath}
+              {t.modules.openPath}
             </Link>
             <Link className="btn btn-accent" to="/lessons">
-              {bo.modules.backLessons}
+              {t.modules.backLessons}
             </Link>
             <Link className="btn btn-primary" to="/tutor">
-              {bo.modules.goTutor}
+              {t.modules.goTutor}
             </Link>
           </div>
         </section>
@@ -618,13 +657,14 @@ export default function LessonDetail() {
 }
 
 function NavRow({ onPrev, onNext, nextLabel }) {
+  const { t } = useI18n()
   return (
     <div className="module-actions" style={{ marginTop: 20, justifyContent: 'space-between' }}>
       <button type="button" className="btn btn-ghost" onClick={onPrev}>
-        {bo.modules.back}
+        {t.modules.back}
       </button>
       <button type="button" className="btn btn-primary" onClick={onNext}>
-        {nextLabel || bo.modules.continue}
+        {nextLabel || t.modules.continue}
       </button>
     </div>
   )

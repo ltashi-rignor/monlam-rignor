@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { bo } from '../i18n/bo'
+import { useI18n } from '../i18n/useI18n'
 import { tibetanOrFallback } from '../i18n/labels'
 import { playFanfare, playLose, playWin, unlockAudio } from '../lib/gameSfx'
+import WorkingProgress from './WorkingProgress'
 
 const TOPICS = [
   { id: 'particles', labelKey: 'topicParticles', hintKey: 'topicParticlesHint' },
@@ -92,12 +93,13 @@ function BlankSentence({ sentence }) {
 }
 
 function RoundFeedback({ round, correct }) {
+  const { t } = useI18n()
   return (
     <div className={`gq-feedback ${correct ? 'is-ok' : 'is-bad'}`}>
-      <p className="gq-feedback-title">{correct ? bo.grammar.correct : bo.grammar.wrong}</p>
+      <p className="gq-feedback-title">{correct ? t.grammar.correct : t.grammar.wrong}</p>
       {round.answer && (
         <p className="gq-fix">
-          {bo.grammar.fixIs} <strong className="tibetan">{round.answer}</strong>
+          {t.grammar.fixIs} <strong className="tibetan">{round.answer}</strong>
         </p>
       )}
       {round.explanation && (
@@ -105,7 +107,7 @@ function RoundFeedback({ round, correct }) {
       )}
       {round.related_rule && (
         <p className="gq-rule">
-          <strong>{bo.grammar.rule}</strong>{' '}
+          <strong>{t.grammar.rule}</strong>{' '}
           {tibetanOrFallback(round.related_rule, round.related_rule)}
         </p>
       )}
@@ -117,6 +119,8 @@ export default function GrammarGame({
   onRequestCheck,
   generateGame,
 }) {
+  const { t } = useI18n()
+
   const [phase, setPhase] = useState('lobby') // lobby | play | done
   const [topic, setTopic] = useState('particles')
   const [busy, setBusy] = useState(false)
@@ -213,29 +217,29 @@ export default function GrammarGame({
     return (
       <div className="panel gq-lobby tibetan">
         <header className="gq-lobby-head">
-          <p className="module-eyebrow">{bo.grammar.questTitle}</p>
-          <h2 style={{ marginTop: 0 }}>{bo.grammar.pickTopic}</h2>
-          <p className="muted">{bo.grammar.questSub}</p>
+          <p className="module-eyebrow">{t.grammar.questTitle}</p>
+          <h2 style={{ marginTop: 0 }}>{t.grammar.pickTopic}</h2>
+          <p className="muted">{t.grammar.questSub}</p>
         </header>
 
-        <div className="gq-topic-grid" role="listbox" aria-label={bo.grammar.pickTopic}>
-          {TOPICS.map((t) => {
-            const on = topic === t.id
+        <div className="gq-topic-grid" role="listbox" aria-label={t.grammar.pickTopic}>
+          {TOPICS.map((item) => {
+            const on = topic === item.id
             return (
               <button
-                key={t.id}
+                key={item.id}
                 type="button"
                 role="option"
                 aria-selected={on}
                 className={`gq-topic-card ${on ? 'is-on' : ''}`}
-                onClick={() => setTopic(t.id)}
+                onClick={() => setTopic(item.id)}
               >
                 <span className="gq-topic-radio" aria-hidden>
                   {on ? '✓' : ''}
                 </span>
                 <span className="gq-topic-copy">
-                  <span className="gq-topic-title">{bo.grammar[t.labelKey]}</span>
-                  <span className="gq-topic-hint">{bo.grammar[t.hintKey]}</span>
+                  <span className="gq-topic-title">{t.grammar[item.labelKey]}</span>
+                  <span className="gq-topic-hint">{t.grammar[item.hintKey]}</span>
                 </span>
               </button>
             )
@@ -244,13 +248,20 @@ export default function GrammarGame({
 
         {error && <p className="error">{error}</p>}
 
+        <WorkingProgress
+          active={busy}
+          title={t.grammar.gameTitle}
+          stages={[t.grammar.gameStage1, t.grammar.gameStage2, t.grammar.gameStage3]}
+          compact
+        />
+
         <button
           type="button"
           className="btn btn-primary gq-start"
           disabled={busy}
           onClick={() => start(topic)}
         >
-          {busy ? bo.grammar.loadingGame : bo.grammar.startGame}
+          {busy ? t.grammar.loadingGame : t.grammar.startGame}
         </button>
       </div>
     )
@@ -260,35 +271,35 @@ export default function GrammarGame({
     const sources = session?.retrieved_sources || []
     return (
       <div className="panel gq-done tibetan">
-        <h2 style={{ marginTop: 0 }}>{bo.grammar.doneTitle}</h2>
-        <p className="muted">{bo.grammar.doneSub}</p>
+        <h2 style={{ marginTop: 0 }}>{t.grammar.doneTitle}</h2>
+        <p className="muted">{t.grammar.doneSub}</p>
         <div className="gq-hud gq-hud-done">
           <div>
-            <span className="muted">{bo.grammar.score}</span>
+            <span className="muted">{t.grammar.score}</span>
             <strong dir="ltr">
               {score}/{rounds.length}
             </strong>
           </div>
           <div>
-            <span className="muted">{bo.grammar.streak}</span>
+            <span className="muted">{t.grammar.streak}</span>
             <strong dir="ltr">{bestStreak}</strong>
           </div>
         </div>
         {session?.offline && (
           <p className="gq-offline">
             {session.source === 'rag' || session.source === 'rag-bank'
-              ? bo.grammar.fromHandbook
-              : bo.grammar.offlineNote}
+              ? t.grammar.fromHandbook
+              : t.grammar.offlineNote}
           </p>
         )}
         {!!sources.length && (
           <section className="gq-sources">
-            <h4>{bo.grammar.sources}</h4>
+            <h4>{t.grammar.sources}</h4>
             <ul>
               {sources.slice(0, 3).map((s, i) => (
                 <li key={i}>
                   <strong>
-                    {bo.grammar.page} {s.page_number ?? '—'}
+                    {t.grammar.page} {s.page_number ?? '—'}
                   </strong>
                   {s.excerpt ? <p className="source-excerpt">{s.excerpt}</p> : null}
                 </li>
@@ -297,15 +308,21 @@ export default function GrammarGame({
           </section>
         )}
         <div className="gq-done-actions">
+          <WorkingProgress
+            active={busy}
+            title={t.grammar.gameTitle}
+            stages={[t.grammar.gameStage1, t.grammar.gameStage2, t.grammar.gameStage3]}
+            compact
+          />
           <button type="button" className="btn btn-primary" onClick={() => start(topic)} disabled={busy}>
-            {busy ? bo.grammar.loadingGame : bo.grammar.playAgain}
+            {busy ? t.grammar.loadingGame : t.grammar.playAgain}
           </button>
           <button type="button" className="btn btn-ghost" onClick={() => setPhase('lobby')}>
-            {bo.grammar.changeTopic}
+            {t.grammar.changeTopic}
           </button>
           {onRequestCheck && (
             <button type="button" className="btn btn-accent" onClick={onRequestCheck}>
-              {bo.grammar.goCheck}
+              {t.grammar.goCheck}
             </button>
           )}
         </div>
@@ -318,7 +335,7 @@ export default function GrammarGame({
       <div className="panel tibetan">
         <p className="error">{error || '—'}</p>
         <button type="button" className="btn btn-ghost" onClick={() => setPhase('lobby')}>
-          {bo.grammar.changeTopic}
+          {t.grammar.changeTopic}
         </button>
       </div>
     )
@@ -331,7 +348,7 @@ export default function GrammarGame({
       <div className="gq-hud">
         <div className="gq-progress">
           <span>
-            {bo.grammar.roundOf}{' '}
+            {t.grammar.roundOf}{' '}
             <strong dir="ltr">
               {idx + 1}/{rounds.length}
             </strong>
@@ -344,10 +361,10 @@ export default function GrammarGame({
         </div>
         <div className="gq-stats">
           <span>
-            {bo.grammar.score} <strong dir="ltr">{score}</strong>
+            {t.grammar.score} <strong dir="ltr">{score}</strong>
           </span>
           <span>
-            {bo.grammar.streak} <strong dir="ltr">{streak}</strong>
+            {t.grammar.streak} <strong dir="ltr">{streak}</strong>
           </span>
         </div>
       </div>
@@ -355,20 +372,20 @@ export default function GrammarGame({
       {session?.source && (
         <p className={`gq-source-badge source-${session.source}`}>
           {session.source === 'melong'
-            ? bo.grammar.fromMelong
+            ? t.grammar.fromMelong
             : session.source === 'bank'
-              ? bo.grammar.fromBank
-              : bo.grammar.fromHandbook}
+              ? t.grammar.fromBank
+              : t.grammar.fromHandbook}
           {round.source_ref ? ` · ${round.source_ref}` : ''}
         </p>
       )}
 
       <p className="gq-prompt">{round.prompt}</p>
-      <p className="muted gq-hint">{isSpot ? bo.grammar.tapWrong : bo.grammar.pickAnswer}</p>
+      <p className="muted gq-hint">{isSpot ? t.grammar.tapWrong : t.grammar.pickAnswer}</p>
 
       {(round.handbook_excerpt || (session?.retrieved_sources || [])[0]?.excerpt) && (
         <aside className="gq-handbook-card">
-          <div className="gq-handbook-label">{bo.grammar.handbookBit}</div>
+          <div className="gq-handbook-label">{t.grammar.handbookBit}</div>
           <p dir="auto">
             {round.handbook_excerpt || session.retrieved_sources[0].excerpt}
           </p>
@@ -424,7 +441,7 @@ export default function GrammarGame({
 
       {locked && (
         <button type="button" className="btn btn-primary gq-next" onClick={goNext}>
-          {idx >= rounds.length - 1 ? bo.grammar.seeResult : bo.grammar.nextRound}
+          {idx >= rounds.length - 1 ? t.grammar.seeResult : t.grammar.nextRound}
         </button>
       )}
     </div>

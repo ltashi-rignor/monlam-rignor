@@ -1,6 +1,6 @@
 import { lessonTypeBo, statusBo } from '../i18n/labels'
 import { lessonTypeGlyph } from '../lib/lessonNav'
-import { bo } from '../i18n/bo'
+import { useI18n } from '../i18n/useI18n'
 
 export default function LessonCard({
   title,
@@ -13,6 +13,8 @@ export default function LessonCard({
   onOpen,
   index = 0,
 }) {
+  const { t } = useI18n()
+
   const glyph = lessonTypeGlyph(lessonType)
   const st = status || 'pending'
 
@@ -40,7 +42,7 @@ export default function LessonCard({
           {glyph}
         </span>
         <div className="meta">
-          {bo.common.week} {weekNumber} · {lessonTypeBo(lessonType)}
+          {t.common.week} {weekNumber} · {lessonTypeBo(lessonType)}
         </div>
       </div>
       <h3 style={{ margin: '8px 0 6px', fontSize: '1.15rem' }}>{title}</h3>
@@ -59,8 +61,8 @@ export default function LessonCard({
           }}
         >
           {st === 'completed' || st === 'in_progress'
-            ? bo.modules.continue
-            : bo.learningPath.goToCourse}
+            ? t.modules.continue
+            : t.learningPath.goToCourse}
         </button>
       )}
     </article>

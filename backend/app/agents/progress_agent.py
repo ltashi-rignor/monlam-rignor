@@ -9,12 +9,14 @@ from app.services.llm import get_llm
 
 
 async def run_progress_update(
-    activity: dict[str, Any], previous: dict[str, Any]
+    activity: dict[str, Any],
+    previous: dict[str, Any],
+    profile: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     llm = get_llm()
-    result = llm.complete_json(
+    result = await llm.complete_json_async(
         prompts.progress_system(),
-        prompts.progress_user(activity, previous),
+        prompts.progress_user(activity, previous, profile),
     )
     for key in (
         "grammar_score",

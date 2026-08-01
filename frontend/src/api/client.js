@@ -6,14 +6,30 @@ const inflight = new Map()
 const cache = new Map()
 const DEFAULT_TTL_MS = 15_000
 
+let refreshInflight = null
+
 function getToken() {
   return localStorage.getItem('mr_token')
+}
+
+function getRefreshToken() {
+  return localStorage.getItem('mr_refresh')
 }
 
 export function setToken(token) {
   if (token) localStorage.setItem('mr_token', token)
   else localStorage.removeItem('mr_token')
   clearApiCache()
+}
+
+export function setRefreshToken(token) {
+  if (token) localStorage.setItem('mr_refresh', token)
+  else localStorage.removeItem('mr_refresh')
+}
+
+export function setSessionTokens({ access_token, refresh_token }) {
+  setToken(access_token || null)
+  if (refresh_token !== undefined) setRefreshToken(refresh_token || null)
 }
 
 export function clearApiCache(prefix) {
@@ -46,18 +62,55 @@ function isPublicPath(pathname) {
   )
 }
 
-function redirectToLoginOn401() {
+function clearSessionAndRedirect() {
   setToken(null)
+  setRefreshToken(null)
+  window.dispatchEvent(new CustomEvent('mr:unauthorized'))
   const path = window.location.pathname || ''
   if (isPublicPath(path)) return
   const next = `${path}${window.location.search || ''}`
   window.location.href = `/login?next=${encodeURIComponent(next)}`
 }
 
+async function tryRefreshAccessToken() {
+  const refresh = getRefreshToken()
+  if (!refresh) return null
+  if (!refreshInflight) {
+    refreshInflight = (async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh_token: refresh }),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) return null
+        setSessionTokens({
+          access_token: data.access_token,
+          refresh_token: data.refresh_token,
+        })
+        return data.access_token
+      } catch {
+        return null
+      } finally {
+        refreshInflight = null
+      }
+    })()
+  }
+  return refreshInflight
+}
+
+function buildBody(options) {
+  if (options.body == null) return undefined
+  if (options.body instanceof FormData) return options.body
+  return JSON.stringify(options.body)
+}
+
 async function request(path, options = {}) {
   const method = (options.method || 'GET').toUpperCase()
+  const isForm = options.body instanceof FormData
   const headers = {
-    'Content-Type': 'application/json',
+    ...(isForm ? {} : { 'Content-Type': 'application/json' }),
     ...(options.headers || {}),
   }
   const token = getToken()
@@ -77,15 +130,28 @@ async function request(path, options = {}) {
   }
 
   const run = (async () => {
-    const res = await fetch(`${API_URL}${path}`, {
+    let res = await fetch(`${API_URL}${path}`, {
       ...options,
       method,
       headers,
-      body: options.body ? JSON.stringify(options.body) : undefined,
+      body: buildBody(options),
     })
 
-    if (res.status === 401) {
-      redirectToLoginOn401()
+    if (res.status === 401 && !path.startsWith('/api/auth/')) {
+      const next = await tryRefreshAccessToken()
+      if (next) {
+        headers.Authorization = `Bearer ${next}`
+        res = await fetch(`${API_URL}${path}`, {
+          ...options,
+          method,
+          headers,
+          body: buildBody(options),
+        })
+      } else {
+        clearSessionAndRedirect()
+      }
+    } else if (res.status === 401) {
+      clearSessionAndRedirect()
     }
 
     const data = await res.json().catch(() => ({}))
@@ -100,13 +166,13 @@ async function request(path, options = {}) {
       cache.set(key, { data, expires: Date.now() + ms })
     }
 
-    // Mutations that change module/dashboard state should drop related caches
     if (method !== 'GET') {
       if (path.startsWith('/api/modules')) clearApiCache('GET:/api/modules')
       if (path.startsWith('/api/planner')) clearApiCache('GET:/api/planner')
       if (path.startsWith('/api/auth/me') && method === 'PUT') clearApiCache('GET:/api/auth/me')
       if (path.startsWith('/api/grammar')) clearApiCache('GET:/api/grammar')
       if (path.startsWith('/api/essay')) clearApiCache('GET:/api/essay')
+      if (path.startsWith('/api/story')) clearApiCache('GET:/api/story')
       if (path.startsWith('/api/practice')) clearApiCache('GET:/api/practice')
       if (path.startsWith('/api/progress')) {
         clearApiCache('GET:/api/progress')
@@ -125,14 +191,25 @@ async function request(path, options = {}) {
       inflight.delete(key)
     }
   }
-
   return run
 }
 
 export const api = {
   request,
   requestOtp: (email) => request('/api/auth/request-otp', { method: 'POST', body: { email } }),
-  verifyOtp: (email, code) => request('/api/auth/verify-otp', { method: 'POST', body: { email, code } }),
+  verifyEmail: (email, code) =>
+    request('/api/auth/verify-email', { method: 'POST', body: { email, code } }),
+  register: (setup_token, username, password, password_confirm) =>
+    request('/api/auth/register', {
+      method: 'POST',
+      body: { setup_token, username, password, password_confirm },
+    }),
+  login: (identifier, password) =>
+    request('/api/auth/login', { method: 'POST', body: { identifier, password } }),
+  refresh: (refresh_token) =>
+    request('/api/auth/refresh', { method: 'POST', body: { refresh_token } }),
+  logout: (refresh_token) =>
+    request('/api/auth/logout', { method: 'POST', body: { refresh_token } }),
   me: () => request('/api/auth/me', { ttl: 60_000 }),
   updateProfile: (body) => request('/api/auth/me', { method: 'PUT', body }),
   getRoadmap: () => request('/api/planner/roadmap', { ttl: 0 }),
@@ -142,12 +219,26 @@ export const api = {
   updateLessonStatus: (id, status) =>
     request(`/api/planner/lessons/${id}/status`, { method: 'POST', body: { status } }),
   checkGrammar: (text) => request('/api/grammar/check', { method: 'POST', body: { text } }),
+  extractGrammarFile: (fileOrFiles) => {
+    const body = new FormData()
+    const list = Array.isArray(fileOrFiles) ? fileOrFiles : [fileOrFiles]
+    if (list.length === 1) body.append('file', list[0])
+    else list.forEach((f) => body.append('files', f))
+    return request('/api/grammar/extract-file', { method: 'POST', body, ttl: 0 })
+  },
+  checkGrammarFile: (fileOrFiles) => {
+    const body = new FormData()
+    const list = Array.isArray(fileOrFiles) ? fileOrFiles : [fileOrFiles]
+    if (list.length === 1) body.append('file', list[0])
+    else list.forEach((f) => body.append('files', f))
+    return request('/api/grammar/check-file', { method: 'POST', body, ttl: 0 })
+  },
   generateGrammarGame: (topic = 'particles') =>
     request('/api/grammar/game', { method: 'POST', body: { topic }, ttl: 0 }),
   recentGrammarMistakes: (limit = 8) =>
     request(`/api/grammar/recent-mistakes?limit=${limit}`, { ttl: 20_000 }),
-  submitEssay: (body) => request('/api/essay/submit', { method: 'POST', body }),
-  essayHistory: () => request('/api/essay/history', { ttl: 15_000 }),
+  generateStory: (body) => request('/api/story/generate', { method: 'POST', body }),
+  storyHistory: () => request('/api/story/history', { ttl: 15_000 }),
   generatePractice: (focus) =>
     request('/api/practice/generate', { method: 'POST', body: { focus: focus || null } }),
   submitPractice: (body) => request('/api/practice/submit', { method: 'POST', body }),
@@ -180,13 +271,22 @@ export const api = {
     form.append('file', blob, filename)
     form.append('language', 'bo')
     form.append('task', 'transcribe')
-    const res = await fetch(`${API_URL}/api/tutor/stt`, {
+    let res = await fetch(`${API_URL}/api/tutor/stt`, {
       method: 'POST',
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: form,
     })
     if (res.status === 401) {
-      redirectToLoginOn401()
+      const next = await tryRefreshAccessToken()
+      if (next) {
+        res = await fetch(`${API_URL}/api/tutor/stt`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${next}` },
+          body: form,
+        })
+      } else {
+        clearSessionAndRedirect()
+      }
     }
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {

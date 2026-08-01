@@ -13,7 +13,7 @@ export default function CmsAi() {
     () => [
       { title: t.cms.ai.tutor, body: t.cms.ai.tutorBody, path: '/tutor' },
       { title: t.cms.ai.grammar, body: t.cms.ai.grammarBody, path: '/grammar' },
-      { title: t.cms.ai.essay, body: t.cms.ai.essayBody, path: '/essay' },
+      { title: t.cms.ai.story, body: t.cms.ai.storyBody, path: '/story' },
       { title: t.cms.ai.practice, body: t.cms.ai.practiceBody, path: '/practice' },
     ],
     [t],

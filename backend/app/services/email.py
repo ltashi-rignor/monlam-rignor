@@ -3,33 +3,31 @@
 from __future__ import annotations
 
 import logging
-import random
-import string
 
 import aiosmtplib
 from email.message import EmailMessage
 
 from app.core.config import get_settings
+from app.core.otp import generate_otp
 
 logger = logging.getLogger(__name__)
 
-
-def generate_otp(length: int = 6) -> str:
-    return "".join(random.choices(string.digits, k=length))
+__all__ = ["generate_otp", "send_otp_email"]
 
 
 async def send_otp_email(email: str, code: str) -> None:
     settings = get_settings()
     if settings.otp_dev_log:
-        logger.info("OTP for %s: %s", email, code)
+        # Dev-only: never enable in production (boot guard enforces this).
+        logger.warning("OTP_DEV_LOG enabled — printing code for %s", email)
         print(f"[DEV OTP] {email} -> {code}")
 
     message = EmailMessage()
     message["From"] = settings.smtp_sender
     message["To"] = email
-    message["Subject"] = f"{settings.app_name} login code"
+    message["Subject"] = f"{settings.app_name} verification code"
     message.set_content(
-        f"Your {settings.app_name} login code is: {code}\n\n"
+        f"Your {settings.app_name} email verification code is: {code}\n\n"
         f"It expires in {settings.otp_expire_minutes} minutes.\n"
         "If you did not request this, ignore this email."
     )
@@ -54,9 +52,8 @@ async def send_otp_email(email: str, code: str) -> None:
     except Exception as exc:
         logger.warning(
             "SMTP send failed (%s); OTP %s for local development.",
-            exc,
+            type(exc).__name__,
             "was logged" if settings.otp_dev_log else "was NOT delivered",
         )
         if not settings.otp_dev_log:
-            # Surface failure when we are not relying on console OTP
             raise

@@ -53,12 +53,29 @@ def build_fallback_interactive_lesson(
     title = str(roadmap_lesson.get("title") or fallback_title or "སློབ་ཚན།")
     content = str(roadmap_lesson.get("content") or "")
     focus_hint = str(week_meta.get("focus") or content or title)
-    likes = str(profile.get("likes") or "")
-    favorites = str(profile.get("favorites") or "")
+    interests = profile.get("interests") or []
+    motivations = profile.get("motivations") or []
+    goals = profile.get("goals") or []
+    likes = str(profile.get("likes") or "") or ", ".join(interests)
+    favorites = str(profile.get("favorites") or "") or ", ".join(motivations)
     name = str(profile.get("name") or "").strip()
+    level_hint = str(profile.get("derived_level") or "")
 
     theme = pick_theme(
-        " ".join([title, content, focus_hint, likes, favorites, lesson_type or ""])
+        " ".join(
+            [
+                title,
+                content,
+                focus_hint,
+                likes,
+                favorites,
+                " ".join(goals),
+                " ".join(interests),
+                " ".join(motivations),
+                lesson_type or "",
+                level_hint,
+            ]
+        )
     )
     bank_all = get_lesson_bank()
     bank = dict(bank_all.get(theme) or bank_all.get("default") or {})
@@ -312,6 +329,9 @@ async def run_interactive_lesson(
     profile: dict[str, Any],
     roadmap_lesson: dict[str, Any],
     week_meta: dict[str, Any],
+    *,
+    timeout: float = 35.0,
+    max_tokens: int = 2200,
 ) -> dict[str, Any]:
     if melong_is_rate_limited():
         raise HTTPException(
@@ -319,11 +339,12 @@ async def run_interactive_lesson(
             detail="Monlam Melong error (429): Organization rate limit exceeded",
         )
     llm = get_llm()
-    result = llm.complete_json(
+    result = await llm.complete_json_async(
         prompts.interactive_lesson_system(),
         prompts.interactive_lesson_user(profile, roadmap_lesson, week_meta),
-        max_tokens=4500,
+        max_tokens=max_tokens,
         retries=0,
+        timeout=timeout,
     )
     if not isinstance(result, dict):
         result = {}

@@ -6,7 +6,7 @@ from uuid import UUID
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -14,6 +14,8 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.agents.planner_agent import run_planner
+from app.core.learner_profile import profile_for_agents
+from app.core.rate_limit import rate_limit_llm
 from app.core.security import get_current_user_id
 from app.database.session import get_db
 from app.models.entities import LearningPlan, Lesson, Progress, User
@@ -113,9 +115,11 @@ async def get_roadmap(
 @router.post("/generate", response_model=LearningPlanOut)
 async def generate_roadmap(
     body: PlannerRequest,
+    request: Request,
     user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
+    rate_limit_llm(request, str(user_id))
     user = await db.get(User, user_id)
     if not user or not user.profile_complete:
         raise HTTPException(
@@ -138,13 +142,7 @@ async def generate_roadmap(
         plan.status = "archived"
         await db.flush()
 
-    profile = {
-        "name": user.name,
-        "age": user.age,
-        "school_class": user.school_class,
-        "likes": user.likes,
-        "favorites": user.favorites,
-    }
+    profile = profile_for_agents(user)
     roadmap = await run_planner(profile)
     plan = LearningPlan(
         user_id=user_id,

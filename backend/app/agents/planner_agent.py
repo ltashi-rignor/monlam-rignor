@@ -63,19 +63,22 @@ async def run_planner(profile: dict[str, Any]) -> dict[str, Any]:
 
     try:
         llm = get_llm()
-        roadmap = llm.complete_json(
+        roadmap = await llm.complete_json_async(
             prompts.planner_system(),
             prompts.planner_user(profile),
-            max_tokens=8192,
+            max_tokens=3500,
             retries=0,
+            timeout=40.0,
         )
+        # Only run the expensive Tibetanize pass when Melong returned English prose.
         if isinstance(roadmap, dict) and _roadmap_has_english(roadmap):
             try:
-                converted = llm.complete_json(
+                converted = await llm.complete_json_async(
                     prompts.planner_tibetanize_system(),
                     prompts.planner_tibetanize_user(roadmap),
-                    max_tokens=8192,
+                    max_tokens=3500,
                     retries=0,
+                    timeout=35.0,
                 )
                 if isinstance(converted, dict):
                     roadmap = converted

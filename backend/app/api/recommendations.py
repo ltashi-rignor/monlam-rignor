@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.recommendation_agent import run_recommendations
+from app.core.learner_profile import profile_for_agents
+from app.core.rate_limit import rate_limit_llm
 from app.core.security import get_current_user_id
 from app.database.session import get_db
 from app.models.entities import ContentItem, Essay, Mistake, Progress, User
@@ -19,9 +21,11 @@ router = APIRouter(prefix="/recommendations", tags=["recommendations"])
 
 @router.get("", response_model=RecommendationsResponse)
 async def get_recommendations(
+    request: Request,
     user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
+    rate_limit_llm(request, str(user_id))
     user = await db.get(User, user_id)
     progress = await db.scalar(select(Progress).where(Progress.user_id == user_id))
     essays = (
@@ -40,7 +44,9 @@ async def get_recommendations(
             .limit(15)
         )
     ).scalars().all()
-    catalog_rows = (await db.execute(select(ContentItem))).scalars().all()
+    catalog_rows = (
+        await db.execute(select(ContentItem).limit(80))
+    ).scalars().all()
     catalog = [
         {
             "content_id": str(c.id),
@@ -55,13 +61,7 @@ async def get_recommendations(
         for c in catalog_rows
     ]
     history = {
-        "profile": {
-            "name": user.name if user else None,
-            "age": user.age if user else None,
-            "school_class": user.school_class if user else None,
-            "likes": user.likes if user else None,
-            "favorites": user.favorites if user else None,
-        },
+        "profile": profile_for_agents(user) if user else {},
         "progress": {
             "grammar_score": progress.grammar_score if progress else 0,
             "writing_score": progress.writing_score if progress else 0,
@@ -78,7 +78,10 @@ async def get_recommendations(
             content_type=r.get("content_type") or "reading",
             title=r.get("title") or "Recommended item",
             description=r.get("description"),
-            level=r.get("level") or (user.school_class if user else "beginner") or "beginner",
+            level=r.get("level")
+            or (user.current_level if user else None)
+            or (user.school_class if user else "beginner")
+            or "beginner",
             topics=r.get("topics") or [],
             url=r.get("url"),
             reason=r.get("reason"),

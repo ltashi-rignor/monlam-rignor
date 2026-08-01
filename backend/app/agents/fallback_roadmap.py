@@ -16,13 +16,21 @@ def build_fallback_roadmap(profile: dict[str, Any] | None = None) -> dict[str, A
     data = load_yaml("roadmap")
 
     name = str(profile.get("name") or "").strip()
+    interests = profile.get("interests") or []
+    motivations = profile.get("motivations") or []
     likes = str(profile.get("likes") or "").strip()
     favorites = str(profile.get("favorites") or "").strip()
-    school = str(profile.get("school_class") or "").strip()
+    variety = str(profile.get("tibetan_variety") or profile.get("school_class") or "").strip()
 
     who = name or str(data.get("default_who") or "སློབ་ཕྲུག")
-    interest = likes or favorites or str(data.get("default_interest") or "ཉིན་རེའི་སྐད་ཆ།")
-    class_bit = f" · འཛིན་གྲ་ {school}" if school else ""
+    interest = (
+        ", ".join(interests[:3])
+        if interests
+        else likes or favorites or str(data.get("default_interest") or "ཉིན་རེའི་སྐད་ཆ།")
+    )
+    if motivations and not interests:
+        interest = ", ".join(motivations[:2])
+    class_bit = f" · {variety}" if variety else ""
 
     title_tmpl = str(data.get("title_template") or "{who}་ཡི་བོད་ཡིག་སློབ་ལམ།")
     summary_tmpl = str(

@@ -1,0 +1,66 @@
+# Production-shaped compose — no code bind mounts, no Vite HMR, strong secrets required.
+# Usage: copy .env with APP_ENV=production and strong JWT_SECRET, then:
+#   docker compose -f docker-compose.prod.yml up --build -d
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: monlam-rignor-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-monlam}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-monlam_rignor}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-monlam} -d ${POSTGRES_DB:-monlam_rignor}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - internal
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: monlam-rignor-backend
+    env_file:
+      - .env
+    environment:
+      APP_ENV: production
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-monlam}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-monlam_rignor}
+      DATABASE_URL_SYNC: postgresql://${POSTGRES_USER:-monlam}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-monlam_rignor}
+      OTP_DEV_LOG: "false"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data:ro
+      - ./classical-tibetan-grammar-handbook_compress.pdf:/data/knowledge/classical-tibetan-grammar-handbook_compress.pdf:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - internal
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    container_name: monlam-rignor-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - internal
+
+volumes:
+  pgdata:
+
+networks:
+  internal:
+    driver: bridge

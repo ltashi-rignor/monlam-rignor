@@ -2,9 +2,11 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { lessonDestination, isActivityLesson, lessonTypeGlyph } from '../lib/lessonNav'
 import { lessonTypeBo, statusBo, tibetanOrFallback } from '../i18n/labels'
-import { bo } from '../i18n/bo'
+import { useI18n } from '../i18n/useI18n'
 
 export default function LessonDetail({ lesson, busy, onClose, onOpenCourse, onComplete }) {
+  const { t } = useI18n()
+
   const [ticked, setTicked] = useState(() => new Set())
 
   if (!lesson) return null
@@ -24,12 +26,12 @@ export default function LessonDetail({ lesson, busy, onClose, onOpenCourse, onCo
   const glyph = lessonTypeGlyph(lesson.lesson_type)
 
   const openLabel = done
-    ? bo.modules.continue
+    ? t.modules.continue
     : isGame
-      ? bo.learningPath.openGame
+      ? t.learningPath.openGame
       : activity
-        ? bo.learningPath.goToActivity
-        : bo.learningPath.goToCourse
+        ? t.learningPath.goToActivity
+        : t.learningPath.goToCourse
 
   function toggleGoal(i) {
     setTicked((prev) => {
@@ -41,7 +43,7 @@ export default function LessonDetail({ lesson, busy, onClose, onOpenCourse, onCo
   }
 
   return (
-    <aside className="lesson-detail panel tibetan path-mission" aria-label={bo.learningPath.lessonDetail}>
+    <aside className="lesson-detail panel tibetan path-mission" aria-label={t.learningPath.lessonDetail}>
       <div className="lesson-detail-head">
         <div className="path-mission-title">
           <span className="path-type-glyph" aria-hidden>
@@ -49,7 +51,7 @@ export default function LessonDetail({ lesson, busy, onClose, onOpenCourse, onCo
           </span>
           <div>
             <p className="meta">
-              {bo.learningPath.week} {lesson.week_number} · {lessonTypeBo(lesson.lesson_type)} ·{' '}
+              {t.learningPath.week} {lesson.week_number} · {lessonTypeBo(lesson.lesson_type)} ·{' '}
               <span className={`status-pill status-${lesson.status || 'pending'}`}>
                 {statusBo(lesson.status)}
               </span>
@@ -58,25 +60,25 @@ export default function LessonDetail({ lesson, busy, onClose, onOpenCourse, onCo
           </div>
         </div>
         <button type="button" className="btn btn-ghost" onClick={onClose}>
-          {bo.learningPath.close}
+          {t.learningPath.close}
         </button>
       </div>
 
       {focus && (
         <p className="lesson-detail-focus">
-          {bo.learningPath.focus}: {focus}
+          {t.learningPath.focus}: {focus}
         </p>
       )}
 
       {lesson.estimated_minutes != null && (
         <p className="meta" dir="ltr">
-          ~{lesson.estimated_minutes} {bo.learningPath.minutes}
+          ~{lesson.estimated_minutes} {t.learningPath.minutes}
         </p>
       )}
 
       {!!goals.length && (
         <div className="lesson-detail-block">
-          <h3>{bo.learningPath.mission}</h3>
+          <h3>{t.learningPath.mission}</h3>
           <ul className="mission-checklist">
             {goals.map((g, i) => (
               <li key={i}>
@@ -98,14 +100,14 @@ export default function LessonDetail({ lesson, busy, onClose, onOpenCourse, onCo
 
       {description && (
         <div className="lesson-detail-block">
-          <h3>{bo.learningPath.description}</h3>
+          <h3>{t.learningPath.description}</h3>
           <p>{description}</p>
         </div>
       )}
 
       {!href && (
         <p className="muted" style={{ marginTop: 12 }}>
-          {bo.learningPath.needRegen}
+          {t.learningPath.needRegen}
         </p>
       )}
 
@@ -123,17 +125,17 @@ export default function LessonDetail({ lesson, busy, onClose, onOpenCourse, onCo
         )}
         {!done && hasId && (
           <button type="button" className="btn btn-accent" disabled={busy} onClick={onComplete}>
-            {busy ? bo.learningPath.marking : bo.learningPath.markDone}
+            {busy ? t.learningPath.marking : t.learningPath.markDone}
           </button>
         )}
         {!activity && (type.includes('practice') || type.includes('quiz')) ? (
           <Link className="btn btn-ghost" to="/practice">
-            {bo.learningPath.openPractice}
+            {t.learningPath.openPractice}
           </Link>
         ) : null}
         {!activity && (type.includes('grammar') || type.includes('writing')) ? (
           <Link className="btn btn-ghost" to="/grammar">
-            {bo.learningPath.openGrammar}
+            {t.learningPath.openGrammar}
           </Link>
         ) : null}
       </div>

@@ -26,8 +26,17 @@ export const FILLER_BANK = [
 
 const STORAGE_KEY = 'mr_voice'
 const CACHE = new Map()
+const CACHE_MAX = 80
 /** Skip starting a filler if the previous Melong wait was this fast (ms). */
 export const FILLER_SKIP_IF_FASTER_MS = 400
+
+function putCache(key, url) {
+  if (CACHE.size >= CACHE_MAX) {
+    const first = CACHE.keys().next().value
+    if (first != null) CACHE.delete(first)
+  }
+  CACHE.set(key, url)
+}
 
 async function fetchTtsUrl(text, voiceName) {
   const cacheKey = `${voiceName}::${text}`
@@ -35,7 +44,7 @@ async function fetchTtsUrl(text, voiceName) {
   if (url) return url
   const data = await api.tutorTts(text, voiceName)
   url = data.audio_url
-  if (url) CACHE.set(cacheKey, url)
+  if (url) putCache(cacheKey, url)
   return url
 }
 
@@ -124,6 +133,11 @@ export function useTibetanVoice() {
       settle(false) // interrupted
     }
   }, [])
+
+  useEffect(() => () => {
+    stop()
+    stopEl(fillerRef)
+  }, [stop])
 
   const stopFiller = useCallback(async ({ fade = false } = {}) => {
     const a = fillerRef.current

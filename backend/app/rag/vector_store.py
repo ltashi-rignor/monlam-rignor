@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any
+from typing import Any, Sequence
 
 from sqlalchemy import delete, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -51,6 +51,7 @@ class VectorStore:
         *,
         top_k: int = 5,
         source_type: str | None = None,
+        source_names: Sequence[str] | None = None,
     ) -> list[dict[str, Any]]:
         from app.core.config import get_settings
 
@@ -73,6 +74,9 @@ class VectorStore:
         if source_type:
             sql += " AND source_type = :source_type"
             params["source_type"] = source_type
+        if source_names:
+            sql += " AND source_name = ANY(:source_names)"
+            params["source_names"] = list(source_names)
         sql += " ORDER BY embedding <=> CAST(:embedding AS vector) LIMIT :limit"
         result = await session.execute(text(sql), params)
         rows = result.mappings().all()

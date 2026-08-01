@@ -9,11 +9,12 @@ from datetime import datetime, timezone
 from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.rate_limit import rate_limit_public
 from app.database.session import get_db
 from app.models.entities import CmsContactMessage, CmsPost, User
 
@@ -131,10 +132,9 @@ async def list_announcements(
 
 @router.get("/stats", response_model=StatsOut)
 async def marketing_stats(db: AsyncSession = Depends(get_db)):
-    learners = await db.scalar(select(func.count()).select_from(User)) or 0
-    # Stable marketing floor so empty local DBs still look alive
+    # Do not expose exact registered user counts publicly.
     return StatsOut(
-        learners=max(int(learners), 128),
+        learners=128,
         letters=30,
         grammar_topics=48,
         ai_lessons=12,
@@ -142,7 +142,12 @@ async def marketing_stats(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/contact", response_model=ContactOut)
-async def submit_contact(body: ContactIn, db: AsyncSession = Depends(get_db)):
+async def submit_contact(
+    body: ContactIn,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    rate_limit_public(request, action="contact", limit=5)
     db.add(
         CmsContactMessage(
             name=body.name.strip(),

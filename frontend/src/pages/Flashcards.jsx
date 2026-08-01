@@ -10,7 +10,7 @@ import VoicePicker from '../components/VoicePicker'
 import { useModuleProgress } from '../hooks/useModuleProgress'
 import { useTibetanVoice } from '../hooks/useTibetanVoice'
 import { playLose, playWin, unlockAudio } from '../lib/gameSfx'
-import { bo } from '../i18n/bo'
+import { useI18n } from '../i18n/useI18n'
 
 const RITUAL = ['see', 'hear', 'meaning']
 
@@ -31,6 +31,8 @@ function pickHearMatch(pool) {
 }
 
 export default function Flashcards() {
+  const { t } = useI18n()
+
   const { progress, markItem } = useModuleProgress()
   const mastered = progress.mastered_words || []
   const { voice, setVoice, speak, loading: audioLoading } = useTibetanVoice()
@@ -91,13 +93,13 @@ export default function Flashcards() {
     setFindLocked(true)
     if (word.id === findRound.target.id) {
       playWin()
-      setFindMsg(bo.modules.flashFindCorrect)
+      setFindMsg(t.modules.flashFindCorrect)
       if (!mastered.includes(word.id)) {
         markItem('word', word.id, 3).catch(() => {})
       }
     } else {
       playLose()
-      setFindMsg(bo.modules.flashFindWrong)
+      setFindMsg(t.modules.flashFindWrong)
     }
   }
 
@@ -110,21 +112,21 @@ export default function Flashcards() {
   }, [mastered])
 
   if (!words.length && !ritualWord) {
-    return <div className="empty panel">{bo.modules.emptyDeck}</div>
+    return <div className="empty panel">{t.modules.emptyDeck}</div>
   }
 
   return (
     <div className="module-page tibetan flash-journey-page">
       <header className="page-header flash-hero">
         <div>
-          <p className="module-eyebrow">{bo.modules.flashEyebrow}</p>
-          <h1>{bo.modules.flashTitle}</h1>
-          <p>{bo.modules.flashJourneySub}</p>
+          <p className="module-eyebrow">{t.modules.flashEyebrow}</p>
+          <h1>{t.modules.flashTitle}</h1>
+          <p>{t.modules.flashJourneySub}</p>
         </div>
         <div className="flash-hero-actions">
           <VoicePicker value={voice} onChange={setVoice} />
           <button type="button" className="btn btn-accent" onClick={startHearMatch}>
-            {bo.modules.flashHearMatch}
+            {t.modules.flashHearMatch}
           </button>
         </div>
       </header>
@@ -151,7 +153,7 @@ export default function Flashcards() {
               <span className="flash-theme-body">
                 <span className="flash-theme-label">{theme.label}</span>
                 <span className="flash-theme-meta" dir="ltr">
-                  {unlocked ? `${prog.done}/${prog.total}` : bo.modules.flashLocked}
+                  {unlocked ? `${prog.done}/${prog.total}` : t.modules.flashLocked}
                 </span>
               </span>
               {prog.complete && <span className="flash-theme-check">✓</span>}
@@ -164,7 +166,7 @@ export default function Flashcards() {
         <div className="flash-theme-stage-head">
           <h2>{currentTheme.label}</h2>
           <p className="muted">
-            {bo.modules.flashThemeHint} · {progressInfo.done}/{progressInfo.total}
+            {t.modules.flashThemeHint} · {progressInfo.done}/{progressInfo.total}
           </p>
         </div>
         <div className="flash-word-grid">
@@ -196,7 +198,7 @@ export default function Flashcards() {
             data-step={step}
             onClick={(e) => e.stopPropagation()}
             role="dialog"
-            aria-label={bo.modules.flashRitualTitle}
+            aria-label={t.modules.flashRitualTitle}
           >
             <button type="button" className="modal-close btn btn-ghost" onClick={closeRitual}>
               ✕
@@ -215,9 +217,9 @@ export default function Flashcards() {
               })}
             </div>
 
-            <p className="module-eyebrow">{bo.modules.flashRitualTitle}</p>
+            <p className="module-eyebrow">{t.modules.flashRitualTitle}</p>
             <div className="flash-ritual-theme muted">
-              {VOCAB_THEMES.find((t) => t.key === ritualWord.theme)?.label || currentTheme.label}
+              {VOCAB_THEMES.find((theme) => theme.key === ritualWord.theme)?.label || currentTheme.label}
             </div>
 
             {step === 'see' && (
@@ -225,7 +227,7 @@ export default function Flashcards() {
                 <div key={ritualWord.id} className="flash-ritual-glyph tibetan">
                   {ritualWord.tibetan}
                 </div>
-                <p className="muted">{bo.modules.flashStepSee}</p>
+                <p className="muted">{t.modules.flashStepSee}</p>
                 <button
                   type="button"
                   className="btn btn-primary"
@@ -234,7 +236,7 @@ export default function Flashcards() {
                     setStep('hear')
                   }}
                 >
-                  {bo.modules.flashNextHear}
+                  {t.modules.flashNextHear}
                 </button>
               </div>
             )}
@@ -242,7 +244,7 @@ export default function Flashcards() {
             {step === 'hear' && (
               <div className="flash-ritual-panel">
                 <div className="flash-ritual-glyph tibetan">{ritualWord.tibetan}</div>
-                <p className="muted">{bo.modules.flashStepHear}</p>
+                <p className="muted">{t.modules.flashStepHear}</p>
                 <button
                   type="button"
                   className="btn btn-accent"
@@ -253,7 +255,7 @@ export default function Flashcards() {
                     setHeard(true)
                   }}
                 >
-                  {audioLoading ? '…' : bo.modules.listen}
+                  {audioLoading ? '…' : t.modules.listen}
                 </button>
                 <button
                   type="button"
@@ -264,14 +266,14 @@ export default function Flashcards() {
                     setStep('meaning')
                   }}
                 >
-                  {bo.modules.flashNextMeaning}
+                  {t.modules.flashNextMeaning}
                 </button>
               </div>
             )}
 
             {step === 'meaning' && (
               <div className="flash-ritual-panel">
-                <p className="muted">{bo.modules.flashStepMeaning}</p>
+                <p className="muted">{t.modules.flashStepMeaning}</p>
                 <div className="perspective flash-ritual-stage">
                   <div
                     className={`flip-card ${flipped ? 'is-flipped' : ''}`}
@@ -286,11 +288,11 @@ export default function Flashcards() {
                     tabIndex={0}
                   >
                     <div className="flip-face flip-front panel">
-                      <div className="muted">{bo.modules.tapFlip}</div>
+                      <div className="muted">{t.modules.tapFlip}</div>
                       <div className="flash-tibetan tibetan">{ritualWord.tibetan}</div>
                     </div>
                     <div className="flip-face flip-back">
-                      <div className="flash-back-label">{bo.modules.meaning}</div>
+                      <div className="flash-back-label">{t.modules.meaning}</div>
                       <div className="flash-english" dir="ltr">
                         {ritualWord.english}
                       </div>
@@ -309,7 +311,7 @@ export default function Flashcards() {
                     speak(ritualWord.tibetan)
                   }}
                 >
-                  {bo.modules.listen}
+                  {t.modules.listen}
                 </button>
                 <button
                   type="button"
@@ -317,7 +319,7 @@ export default function Flashcards() {
                   disabled={!flipped}
                   onClick={finishRitual}
                 >
-                  {bo.modules.flashFinishWord}
+                  {t.modules.flashFinishWord}
                 </button>
               </div>
             )}
@@ -343,15 +345,15 @@ export default function Flashcards() {
             >
               ✕
             </button>
-            <h2 style={{ marginTop: 0 }}>{bo.modules.flashHearMatch}</h2>
-            <p className="muted">{bo.modules.flashHearMatchHint}</p>
+            <h2 style={{ marginTop: 0 }}>{t.modules.flashHearMatch}</h2>
+            <p className="muted">{t.modules.flashHearMatchHint}</p>
             <button
               type="button"
               className="btn btn-accent"
               disabled={audioLoading}
               onClick={() => speak(findRound.target.tibetan)}
             >
-              {bo.modules.listen}
+              {t.modules.listen}
             </button>
             <div className="flash-find-options">
               {findRound.options.map((w) => (
@@ -369,7 +371,7 @@ export default function Flashcards() {
             {findMsg && <p className="flash-find-msg">{findMsg}</p>}
             {findLocked && (
               <button type="button" className="btn btn-primary" onClick={startHearMatch}>
-                {bo.modules.flashFindAgain}
+                {t.modules.flashFindAgain}
               </button>
             )}
           </div>

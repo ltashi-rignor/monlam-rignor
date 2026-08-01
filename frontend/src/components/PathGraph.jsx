@@ -1,6 +1,6 @@
 import { lessonTypeBo, statusBo, tibetanOrFallback } from '../i18n/labels'
 import { sameLessonId, lessonTypeGlyph } from '../lib/lessonNav'
-import { bo } from '../i18n/bo'
+import { useI18n } from '../i18n/useI18n'
 
 function weekPct(lessons) {
   const total = lessons.length || 1
@@ -10,13 +10,15 @@ function weekPct(lessons) {
 }
 
 export default function PathGraph({ weeks, currentWeek, selectedId, onSelectLesson, onOpenLesson }) {
+  const { t } = useI18n()
+
   if (!weeks.length) return null
 
   return (
     <section className="path-graph panel tibetan path-journey">
       <div className="path-graph-head">
-        <h2>{bo.learningPath.pathGraph}</h2>
-        <p className="muted">{bo.learningPath.journeyHint}</p>
+        <h2>{t.learningPath.pathGraph}</h2>
+        <p className="muted">{t.learningPath.journeyHint}</p>
       </div>
 
       <div className="path-track" role="list">
@@ -41,7 +43,7 @@ export default function PathGraph({ weeks, currentWeek, selectedId, onSelectLess
               <div className="path-week-body">
                 <div className="path-week-meta">
                   <strong>
-                    {bo.learningPath.week} {week.week_number}
+                    {t.learningPath.week} {week.week_number}
                   </strong>
                   <span className="path-pct" dir="ltr">
                     {pct}%
@@ -87,7 +89,7 @@ export default function PathGraph({ weeks, currentWeek, selectedId, onSelectLess
                               onOpenLesson(lesson)
                             }}
                           >
-                            {status === 'completed' ? bo.modules.continue : bo.learningPath.goToCourse}
+                            {status === 'completed' ? t.modules.continue : t.learningPath.goToCourse}
                           </button>
                         )}
                       </div>

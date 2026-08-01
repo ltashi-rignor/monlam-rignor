@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { bo } from '../i18n/bo'
+import { useI18n } from '../i18n/useI18n'
 import { mistakeTypeBo, tibetanOrFallback } from '../i18n/labels'
 
 function highlightText(text, mistakes, onTapSpan) {
@@ -58,6 +58,7 @@ function highlightText(text, mistakes, onTapSpan) {
 }
 
 function MistakeCard({ mistake, kind, id, active }) {
+  const { t } = useI18n()
   const type = mistakeTypeBo(mistake.mistake_type)
   const explanation = tibetanOrFallback(mistake.explanation, '')
   const rule = tibetanOrFallback(mistake.related_rule, '')
@@ -81,12 +82,12 @@ function MistakeCard({ mistake, kind, id, active }) {
       {explanation && <p className="mistake-explain">{explanation}</p>}
       {rule && (
         <p className="mistake-rule">
-          <strong>{bo.grammar.rule}</strong> {rule}
+          <strong>{t.grammar.rule}</strong> {rule}
         </p>
       )}
       {source && (
         <p className="mistake-source">
-          <strong>{bo.grammar.source}</strong> {source}
+          <strong>{t.grammar.source}</strong> {source}
         </p>
       )}
     </article>
@@ -94,6 +95,7 @@ function MistakeCard({ mistake, kind, id, active }) {
 }
 
 function PracticePrompt({ question, index }) {
+  const { t } = useI18n()
   const [open, setOpen] = useState(false)
   const q = tibetanOrFallback(question, '')
   if (!q) return null
@@ -106,18 +108,21 @@ function PracticePrompt({ question, index }) {
         {q}
       </p>
       <button type="button" className="btn btn-ghost" onClick={() => setOpen((v) => !v)}>
-        {open ? bo.grammar.hideHint : bo.grammar.showHint}
+        {open ? t.grammar.hideHint : t.grammar.showHint}
       </button>
-      {open && <p className="practice-hint">{bo.grammar.tryRewrite}</p>}
+      {open && <p className="practice-hint">{t.grammar.tryRewrite}</p>}
     </div>
   )
 }
 
 export default function GrammarResult({ result, originalText, onApplyCorrection }) {
+  const { t } = useI18n()
+
   const mistakes = result?.mistakes || []
   const honorifics = result?.honorific_mistakes || []
   const all = useMemo(() => [...mistakes, ...honorifics], [mistakes, honorifics])
   const total = all.length
+  const isClean = total === 0
   const summary = tibetanOrFallback(result?.summary, '')
   const praise = tibetanOrFallback(result?.praise, '')
   const rules = (result?.related_rules || [])
@@ -127,6 +132,10 @@ export default function GrammarResult({ result, originalText, onApplyCorrection 
   const sources = result?.retrieved_sources || []
   const [activeId, setActiveId] = useState(null)
   const listRef = useRef(null)
+  const showCorrected =
+    !isClean &&
+    result.corrected_version &&
+    result.corrected_version.trim() !== (originalText || '').trim()
 
   function focusMistake(index, original) {
     // Prefer exact original match among combined list
@@ -146,90 +155,97 @@ export default function GrammarResult({ result, originalText, onApplyCorrection 
   if (!result) {
     return (
       <div className="panel grammar-result grammar-empty tibetan">
-        <h3 style={{ marginTop: 0 }}>{bo.grammar.result}</h3>
-        <p className="muted">{bo.grammar.emptyHint}</p>
+        <h3 style={{ marginTop: 0 }}>{t.grammar.result}</h3>
+        <p className="muted">{t.grammar.emptyHint}</p>
       </div>
     )
   }
 
   return (
-    <div className="panel grammar-result tibetan">
+    <div className={`panel grammar-result tibetan${isClean ? ' is-clean' : ''}`}>
       <div className="grammar-result-head">
-        <h3 style={{ margin: 0 }}>{bo.grammar.result}</h3>
+        <h3 style={{ margin: 0 }}>{t.grammar.result}</h3>
         <span className={`grammar-count ${total ? 'has-errors' : 'is-clean'}`}>
           {total
-            ? `${bo.grammar.mistakeCount} ${total}`
-            : bo.grammar.noMistakes}
+            ? `${t.grammar.mistakeCount} ${total}`
+            : t.grammar.noMistakes}
         </span>
       </div>
 
-      {(praise || summary) && (
-        <div className="grammar-feedback">
+      {(praise || summary || isClean) && (
+        <div className={`grammar-feedback${isClean ? ' is-clean' : ''}`}>
           {praise && <p className="grammar-praise">{praise}</p>}
           {summary && <p className="grammar-summary">{summary}</p>}
+          {isClean && !praise && !summary && (
+            <p className="grammar-praise">{t.grammar.noMistakes}</p>
+          )}
         </div>
       )}
 
-      {originalText && (
+      {originalText && !isClean && (
         <section className="grammar-section">
-          <h4>{bo.grammar.annotated}</h4>
-          <p className="muted annotate-hint">{bo.grammar.tapMistake}</p>
+          <h4>{t.grammar.annotated}</h4>
+          <p className="muted annotate-hint">{t.grammar.tapMistake}</p>
           <div className="annotate-box">{highlightText(originalText, all, focusMistake)}</div>
         </section>
       )}
 
-      <section className="grammar-section">
-        <div className="corrected-head">
-          <h4>{bo.grammar.corrected}</h4>
-          {onApplyCorrection && result.corrected_version && (
-            <button type="button" className="btn btn-ghost" onClick={onApplyCorrection}>
-              {bo.grammar.applyFix}
-            </button>
-          )}
-        </div>
-        <p className="corrected-text">{result.corrected_version}</p>
-      </section>
-
-      <div ref={listRef}>
+      {showCorrected && (
         <section className="grammar-section">
-          <h4>{bo.grammar.mistakes}</h4>
-          {!mistakes.length && <p className="empty">{bo.grammar.noGeneralMistakes}</p>}
-          <div className="mistake-list">
-            {mistakes.map((m, i) => (
-              <MistakeCard
-                key={`g-${i}`}
-                id={`mistake-card-${i}`}
-                mistake={m}
-                kind="grammar"
-                active={activeId === `mistake-card-${i}`}
-              />
-            ))}
+          <div className="corrected-head">
+            <h4>{t.grammar.corrected}</h4>
+            {onApplyCorrection && (
+              <button type="button" className="btn btn-ghost" onClick={onApplyCorrection}>
+                {t.grammar.applyFix}
+              </button>
+            )}
           </div>
+          <p className="corrected-text">{result.corrected_version}</p>
         </section>
+      )}
 
-        <section className="grammar-section">
-          <h4>{bo.grammar.honorifics}</h4>
-          {!honorifics.length && <p className="empty">{bo.grammar.noHonorifics}</p>}
-          <div className="mistake-list">
-            {honorifics.map((m, i) => {
-              const cardId = `mistake-card-${mistakes.length + i}`
-              return (
+      {!isClean && (
+        <div ref={listRef}>
+          <section className="grammar-section">
+            <h4>{t.grammar.mistakes}</h4>
+            {!mistakes.length && <p className="empty">{t.grammar.noGeneralMistakes}</p>}
+            <div className="mistake-list">
+              {mistakes.map((m, i) => (
                 <MistakeCard
-                  key={`h-${i}`}
-                  id={cardId}
+                  key={`g-${i}`}
+                  id={`mistake-card-${i}`}
                   mistake={m}
-                  kind="honorific"
-                  active={activeId === cardId}
+                  kind="grammar"
+                  active={activeId === `mistake-card-${i}`}
                 />
-              )
-            })}
-          </div>
-        </section>
-      </div>
+              ))}
+            </div>
+          </section>
 
-      {!!rules.length && (
+          <section className="grammar-section">
+            <h4>{t.grammar.honorifics}</h4>
+            {!honorifics.length && <p className="empty">{t.grammar.noHonorifics}</p>}
+            <div className="mistake-list">
+              {honorifics.map((m, i) => {
+                const cardId = `mistake-card-${mistakes.length + i}`
+                return (
+                  <MistakeCard
+                    key={`h-${i}`}
+                    id={cardId}
+                    mistake={m}
+                    kind="honorific"
+                    active={activeId === cardId}
+                  />
+                )
+              })}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {!isClean && !!rules.length && (
         <section className="grammar-section">
-          <h4>{bo.grammar.relatedRules}</h4>
+          <h4>{t.grammar.relatedRules}</h4>
           <ul className="grammar-rules">
             {rules.map((r, i) => (
               <li key={i}>{r}</li>
@@ -240,28 +256,34 @@ export default function GrammarResult({ result, originalText, onApplyCorrection 
 
       {!!questions.length && (
         <section className="grammar-section">
-          <h4>{bo.grammar.practiceQ}</h4>
+          <h4>{t.grammar.practiceQ}</h4>
           <div className="grammar-practice-list">
             {questions.map((q, i) => (
               <PracticePrompt key={i} question={q} index={i} />
             ))}
           </div>
           <Link className="btn btn-accent" to="/practice" style={{ marginTop: 8 }}>
-            {bo.grammar.goPractice}
+            {t.grammar.goPractice}
           </Link>
         </section>
       )}
 
       {!!sources.length && (
         <section className="grammar-section">
-          <h4>{bo.grammar.sources}</h4>
+          <h4>{t.grammar.sources}</h4>
+          <p className="muted annotate-hint">
+            {isClean
+              ? t.grammar.groundedClean
+              : t.grammar.groundedErrors}
+          </p>
           <ul className="grammar-sources">
             {sources.map((s, i) => (
               <li key={i}>
                 <strong>
-                  {bo.grammar.page} {s.page_number ?? '—'}
+                  {(s.source_name || 'grammar').replace(/-/g, ' ')}
+                  {s.page_number != null ? ` · ${t.grammar.page} ${s.page_number}` : ''}
                 </strong>
-                {s.excerpt ? (
+                {!isClean && s.excerpt ? (
                   <p className="source-excerpt">{tibetanOrFallback(s.excerpt, s.excerpt)}</p>
                 ) : null}
               </li>

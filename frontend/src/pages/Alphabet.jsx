@@ -14,7 +14,7 @@ import VoicePicker from '../components/VoicePicker'
 import { useModuleProgress } from '../hooks/useModuleProgress'
 import { useTibetanVoice } from '../hooks/useTibetanVoice'
 import { playLose, playWin, unlockAudio } from '../lib/gameSfx'
-import { bo } from '../i18n/bo'
+import { useI18n } from '../i18n/useI18n'
 
 const RITUAL = ['see', 'hear', 'trace', 'word']
 
@@ -32,6 +32,8 @@ function pickHearFind(mastered, unlockedGlyphs) {
 }
 
 export default function Alphabet() {
+  const { t } = useI18n()
+
   const { progress, markItem } = useModuleProgress()
   const mastered = progress.mastered_letters || []
   const { voice, setVoice, speak, loading: audioLoading } = useTibetanVoice()
@@ -100,14 +102,14 @@ export default function Alphabet() {
     setFindLocked(true)
     if (glyph === findRound.target) {
       playWin()
-      setFindMsg(bo.modules.alphaFindCorrect)
+      setFindMsg(t.modules.alphaFindCorrect)
       const c = consonantByGlyph(glyph)
       if (c && !mastered.includes(c.id)) {
         markItem('letter', c.id, 3).catch(() => {})
       }
     } else {
       playLose()
-      setFindMsg(bo.modules.alphaFindWrong)
+      setFindMsg(t.modules.alphaFindWrong)
     }
   }
 
@@ -123,14 +125,14 @@ export default function Alphabet() {
     <div className="module-page tibetan alpha-journey-page">
       <header className="page-header alpha-hero">
         <div>
-          <p className="module-eyebrow">{bo.modules.alphabetEyebrow}</p>
-          <h1>{bo.modules.alphabetTitle}</h1>
-          <p>{bo.modules.alphaJourneySub}</p>
+          <p className="module-eyebrow">{t.modules.alphabetEyebrow}</p>
+          <h1>{t.modules.alphabetTitle}</h1>
+          <p>{t.modules.alphaJourneySub}</p>
         </div>
         <div className="alpha-hero-actions">
           <VoicePicker value={voice} onChange={setVoice} />
           <button type="button" className="btn btn-accent" onClick={startHearFind}>
-            {bo.modules.alphaHearFind}
+            {t.modules.alphaHearFind}
           </button>
         </div>
       </header>
@@ -162,7 +164,7 @@ export default function Alphabet() {
                 <span className="alpha-row-meta" dir="ltr">
                   {unlocked
                     ? `${prog.done}/${prog.total}`
-                    : bo.modules.alphaLocked}
+                    : t.modules.alphaLocked}
                 </span>
               </span>
               {prog.complete && <span className="alpha-row-check">✓</span>}
@@ -175,7 +177,7 @@ export default function Alphabet() {
         <div className="alpha-row-stage-head">
           <h2>{currentRow.label}</h2>
           <p className="muted">
-            {bo.modules.alphaRowHint} · {progressInfo.done}/{progressInfo.total}
+            {t.modules.alphaRowHint} · {progressInfo.done}/{progressInfo.total}
           </p>
         </div>
         <div className="alpha-row-letters">
@@ -200,17 +202,17 @@ export default function Alphabet() {
         </div>
         <div className="alpha-row-links">
           <Link className="btn btn-ghost" to="/handwriting">
-            {bo.modules.alphaGoHandwriting}
+            {t.modules.alphaGoHandwriting}
           </Link>
           <Link className="btn btn-ghost" to="/letter-party">
-            {bo.modules.alphaGoParty}
+            {t.modules.alphaGoParty}
           </Link>
         </div>
       </section>
 
       <section className="panel alpha-vowels-block">
         <h2 className="module-section-title" style={{ marginTop: 0 }}>
-          {bo.modules.vowels}
+          {t.modules.vowels}
         </h2>
         <div className="alpha-vowel-row">
           {VOWELS.map((v) => (
@@ -239,7 +241,7 @@ export default function Alphabet() {
             data-step={step}
             onClick={(e) => e.stopPropagation()}
             role="dialog"
-            aria-label={bo.modules.alphaRitualTitle}
+            aria-label={t.modules.alphaRitualTitle}
           >
             <button type="button" className="modal-close btn btn-ghost" onClick={closeRitual}>
               ✕
@@ -258,7 +260,7 @@ export default function Alphabet() {
               })}
             </div>
 
-            <p className="module-eyebrow">{bo.modules.alphaRitualTitle}</p>
+            <p className="module-eyebrow">{t.modules.alphaRitualTitle}</p>
             <div key={ritualLetter.letter} className="alpha-ritual-glyph tibetan">
               {ritualLetter.letter}
             </div>
@@ -268,7 +270,7 @@ export default function Alphabet() {
 
             {step === 'see' && (
               <div className="alpha-ritual-panel">
-                <p className="muted">{bo.modules.alphaStepSee}</p>
+                <p className="muted">{t.modules.alphaStepSee}</p>
                 <button
                   type="button"
                   className="btn btn-primary"
@@ -277,14 +279,14 @@ export default function Alphabet() {
                     setStep('hear')
                   }}
                 >
-                  {bo.modules.alphaNextHear}
+                  {t.modules.alphaNextHear}
                 </button>
               </div>
             )}
 
             {step === 'hear' && (
               <div className="alpha-ritual-panel">
-                <p className="muted">{bo.modules.alphaStepHear}</p>
+                <p className="muted">{t.modules.alphaStepHear}</p>
                 <button
                   type="button"
                   className="btn btn-accent"
@@ -295,7 +297,7 @@ export default function Alphabet() {
                     setHeard(true)
                   }}
                 >
-                  {audioLoading ? '…' : bo.modules.listen}
+                  {audioLoading ? '…' : t.modules.listen}
                 </button>
                 <button
                   type="button"
@@ -303,14 +305,14 @@ export default function Alphabet() {
                   disabled={!heard}
                   onClick={() => setStep('trace')}
                 >
-                  {bo.modules.alphaNextTrace}
+                  {t.modules.alphaNextTrace}
                 </button>
               </div>
             )}
 
             {step === 'trace' && (
               <div className="alpha-ritual-panel">
-                <p className="muted">{bo.modules.alphaStepTrace}</p>
+                <p className="muted">{t.modules.alphaStepTrace}</p>
                 <LetterMiniTrace
                   glyph={ritualLetter.letter}
                   onComplete={() => setTraced(true)}
@@ -321,7 +323,7 @@ export default function Alphabet() {
                   disabled={!traced}
                   onClick={() => setStep('word')}
                 >
-                  {bo.modules.alphaNextWord}
+                  {t.modules.alphaNextWord}
                 </button>
                 {!traced && (
                   <button
@@ -332,7 +334,7 @@ export default function Alphabet() {
                       setStep('word')
                     }}
                   >
-                    {bo.modules.alphaSkipTrace}
+                    {t.modules.alphaSkipTrace}
                   </button>
                 )}
               </div>
@@ -340,7 +342,7 @@ export default function Alphabet() {
 
             {step === 'word' && (
               <div className="alpha-ritual-panel">
-                <p className="muted">{bo.modules.alphaStepWord}</p>
+                <p className="muted">{t.modules.alphaStepWord}</p>
                 {example ? (
                   <div className="alpha-example-card">
                     <div className="tibetan alpha-example-word">{example.word}</div>
@@ -360,7 +362,7 @@ export default function Alphabet() {
                         setWordHeard(true)
                       }}
                     >
-                      {bo.modules.alphaHearWord}
+                      {t.modules.alphaHearWord}
                     </button>
                   </div>
                 ) : (
@@ -372,7 +374,7 @@ export default function Alphabet() {
                   disabled={example ? !wordHeard : false}
                   onClick={finishRitual}
                 >
-                  {bo.modules.alphaFinishLetter}
+                  {t.modules.alphaFinishLetter}
                 </button>
               </div>
             )}
@@ -398,15 +400,15 @@ export default function Alphabet() {
             >
               ✕
             </button>
-            <h2 style={{ marginTop: 0 }}>{bo.modules.alphaHearFind}</h2>
-            <p className="muted">{bo.modules.alphaHearFindHint}</p>
+            <h2 style={{ marginTop: 0 }}>{t.modules.alphaHearFind}</h2>
+            <p className="muted">{t.modules.alphaHearFindHint}</p>
             <button
               type="button"
               className="btn btn-accent"
               disabled={audioLoading}
               onClick={() => speak(findRound.target)}
             >
-              {bo.modules.listen}
+              {t.modules.listen}
             </button>
             <div className="alpha-find-options">
               {findRound.options.map((g) => (
@@ -424,7 +426,7 @@ export default function Alphabet() {
             {findMsg && <p className="alpha-find-msg">{findMsg}</p>}
             {findLocked && (
               <button type="button" className="btn btn-primary" onClick={startHearFind}>
-                {bo.modules.alphaFindAgain}
+                {t.modules.alphaFindAgain}
               </button>
             )}
           </div>

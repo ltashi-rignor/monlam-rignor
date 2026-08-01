@@ -4,6 +4,7 @@ import { api } from '../api/client'
 import LessonDetail from '../components/LessonDetail'
 import PathGraph from '../components/PathGraph'
 import Roadmap from '../components/Roadmap'
+import WorkingProgress from '../components/WorkingProgress'
 import { lessonDestination, isActivityLesson, lessonTypeGlyph } from '../lib/lessonNav'
 import { useI18n } from '../i18n/useI18n'
 import { lessonTypeBo, statusBo, tibetanOrFallback } from '../i18n/labels'
@@ -273,6 +274,15 @@ export default function LearningPath() {
         {error && <p className="error">{error}</p>}
         <div className="panel empty">
           <p>{t.learningPath.noPlan}</p>
+          <WorkingProgress
+            active={busy}
+            title={t.learningPath.pathTitle}
+            stages={[
+              t.learningPath.pathStage1,
+              t.learningPath.pathStage2,
+              t.learningPath.pathStage3,
+            ]}
+          />
           <button className="btn btn-primary" onClick={() => regenerate(false)} disabled={busy}>
             {busy ? t.learningPath.creating : t.learningPath.createFirst}
           </button>
@@ -305,6 +315,16 @@ export default function LearningPath() {
       </header>
 
       {error && <p className="error">{error}</p>}
+
+      <WorkingProgress
+        active={busy}
+        title={t.learningPath.pathTitle}
+        stages={[
+          t.learningPath.pathStage1,
+          t.learningPath.pathStage2,
+          t.learningPath.pathStage3,
+        ]}
+      />
 
       {plan && (
         <div className="path-overview panel path-hero-stage">

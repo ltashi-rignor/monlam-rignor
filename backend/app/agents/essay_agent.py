@@ -9,12 +9,14 @@ from app.services.llm import get_llm
 
 
 async def run_essay_evaluation(
-    text: str, grammar_summary: str | None = None
+    text: str,
+    grammar_summary: str | None = None,
+    profile: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     llm = get_llm()
-    result = llm.complete_json(
+    result = await llm.complete_json_async(
         prompts.essay_system(),
-        prompts.essay_user(text, grammar_summary),
+        prompts.essay_user(text, grammar_summary, profile),
     )
     for key in (
         "grammar_score",

@@ -297,7 +297,7 @@ async def run_grammar_game(
 
     try:
         llm = get_llm()
-        result = llm.complete_json(
+        result = await llm.complete_json_async(
             prompts.grammar_game_system(),
             prompts.grammar_game_user(key, retrieved, recent_mistakes),
             max_tokens=3500,

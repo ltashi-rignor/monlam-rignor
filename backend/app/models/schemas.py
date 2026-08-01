@@ -15,16 +15,44 @@ class VerifyOTPBody(BaseModel):
     code: str = Field(min_length=4, max_length=10)
 
 
+class RegisterBody(BaseModel):
+    setup_token: str
+    username: str = Field(min_length=3, max_length=32)
+    password: str = Field(min_length=8, max_length=128)
+    password_confirm: str = Field(min_length=8, max_length=128)
+
+
+class LoginBody(BaseModel):
+    identifier: str = Field(min_length=3, max_length=320)
+    password: str = Field(min_length=1, max_length=128)
+
+
 class TokenResponse(BaseModel):
     access_token: str
+    refresh_token: str | None = None
     token_type: str = "bearer"
     is_new_user: bool = False
     profile_complete: bool = False
 
 
+class RefreshBody(BaseModel):
+    refresh_token: str = Field(min_length=20, max_length=512)
+
+
+class SetupTokenResponse(BaseModel):
+    setup_token: str
+    user_id: UUID
+    email: EmailStr
+    email_verified: bool = True
+    needs_account: bool = True
+
+
 class UserProfileUpdate(BaseModel):
     name: str | None = None
     age: int | None = Field(default=None, ge=5, le=120)
+    # Rich profile patch (merged into users.learner_profile)
+    learner_profile: dict[str, Any] | None = None
+    # Legacy fields still accepted for older clients
     school_class: str | None = None
     likes: str | None = None
     favorites: str | None = None
@@ -33,11 +61,19 @@ class UserProfileUpdate(BaseModel):
 class UserOut(BaseModel):
     id: UUID
     email: EmailStr
+    username: str | None = None
+    email_verified: bool = False
     name: str | None
     age: int | None
     school_class: str | None
     likes: str | None
     favorites: str | None
+    learner_profile: dict[str, Any] = Field(default_factory=dict)
+    native_language: str | None = None
+    current_level: str | None = None
+    goal: str | None = None
+    daily_study_time: int | None = None
+    learning_style: str | None = None
     profile_complete: bool
 
     model_config = {"from_attributes": True}
@@ -81,7 +117,7 @@ class LessonOut(BaseModel):
 
 # ---------- Grammar ----------
 class GrammarCheckRequest(BaseModel):
-    text: str = Field(min_length=1)
+    text: str = Field(min_length=1, max_length=8000)
     essay_id: UUID | None = None
 
 
@@ -103,6 +139,21 @@ class GrammarCheckResponse(BaseModel):
     retrieved_sources: list[dict[str, Any]] = []
     summary: str | None = None
     praise: str | None = None
+
+
+class GrammarFileCheckResponse(GrammarCheckResponse):
+    extracted_text: str
+    filename: str | None = None
+    truncated: bool = False
+    file_kind: str | None = None
+
+
+class GrammarExtractResponse(BaseModel):
+    text: str
+    filename: str | None = None
+    truncated: bool = False
+    file_kind: str | None = None
+    char_count: int = 0
 
 
 class GrammarGameRequest(BaseModel):
@@ -148,8 +199,8 @@ class RecentMistakeOut(BaseModel):
 
 # ---------- Essay ----------
 class EssaySubmitRequest(BaseModel):
-    title: str | None = None
-    content: str = Field(min_length=1)
+    title: str | None = Field(default=None, max_length=200)
+    content: str = Field(min_length=1, max_length=12000)
     run_grammar: bool = True
 
 

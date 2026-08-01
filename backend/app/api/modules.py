@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,9 +20,13 @@ from app.agents.interactive_lesson_agent import (
     normalize_interactive_lesson,
     run_interactive_lesson,
 )
+from app.core.learner_profile import profile_for_agents
+from app.core.rate_limit import rate_limit_llm
 from app.core.security import get_current_user_id
-from app.database.session import get_db
+from app.database.session import AsyncSessionLocal, get_db
 from app.models.entities import LearningPlan, Lesson, Progress, User
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/modules", tags=["modules"])
 
@@ -77,8 +82,8 @@ class ModuleProgressIn(BaseModel):
 
 class QuizSubmitIn(BaseModel):
     lesson_id: str = Field(min_length=1, max_length=64)
-    score: int = Field(ge=0)
-    total: int = Field(ge=1)
+    score: int = Field(ge=0, le=1000)
+    total: int = Field(ge=1, le=1000)
 
 
 class QuizSubmitOut(BaseModel):
@@ -243,9 +248,10 @@ async def submit_module_quiz(
 ):
     progress = await _ensure_progress(db, user_id)
     modules = _get_modules(progress)
-    xp_earned = max(0, body.score) * 10
+    safe_score = min(int(body.score), int(body.total), 1000)
+    xp_earned = max(0, safe_score) * 10
     modules["xp"] = int(modules["xp"]) + xp_earned
-    passed = body.score >= max(1, body.total // 2)
+    passed = safe_score >= max(1, body.total // 2)
     if passed:
         _mark_modules_lesson_done(modules, body.lesson_id)
         # Keep Learning Path status in sync with interactive lesson completion
@@ -319,6 +325,8 @@ async def list_interactive_lessons(
 @router.get("/lessons/{lesson_id}")
 async def get_interactive_lesson(
     lesson_id: UUID,
+    request: Request,
+    background_tasks: BackgroundTasks,
     regenerate: bool = False,
     user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
@@ -348,19 +356,13 @@ async def get_interactive_lesson(
         plan.current_week = max(plan.current_week, lesson.week_number)
 
     cached_body = plan_cache.get(lid) if isinstance(plan_cache.get(lid), dict) else None
-    # Skip stale/thin caches so learners get richer bank or Melong content.
+    # Fast path: return a rich cached Melong/bank lesson immediately.
     if not regenerate and cached_body and not lesson_needs_refresh(cached_body):
         await db.flush()
         return cached_body
 
     user = await db.get(User, user_id)
-    profile = {
-        "name": user.name if user else None,
-        "age": user.age if user else None,
-        "school_class": user.school_class if user else None,
-        "likes": user.likes if user else None,
-        "favorites": user.favorites if user else None,
-    }
+    profile = profile_for_agents(user) if user else {}
     week_meta = _week_meta(plan, lesson.week_number)
     roadmap_lesson = {
         "title": lesson.title,
@@ -369,15 +371,49 @@ async def get_interactive_lesson(
         "week_number": lesson.week_number,
     }
 
-    # Prefer Melong; on rate-limit / outage, keep learning with offline lesson.
-    # If regenerate failed but a rich cached body exists, keep the cache.
+    # Default open: serve curated bank instantly, enrich with Melong in background.
+    if not regenerate:
+        raw = build_fallback_interactive_lesson(
+            lesson_id=lid,
+            week_number=lesson.week_number,
+            lesson_type=lesson.lesson_type,
+            fallback_title=lesson.title,
+            roadmap_lesson=roadmap_lesson,
+            week_meta=week_meta,
+            profile=profile,
+        )
+        normalized = normalize_interactive_lesson(
+            raw,
+            lesson_id=lid,
+            week_number=lesson.week_number,
+            lesson_type=lesson.lesson_type,
+            fallback_title=lesson.title,
+            roadmap_lesson=roadmap_lesson,
+            week_meta=week_meta,
+            profile=profile,
+        )
+        modules[INTERACTIVE_KEY] = {plan_key: {**plan_cache, lid: normalized}}
+        _set_modules(progress, modules)
+        await db.flush()
+        background_tasks.add_task(
+            _enrich_interactive_lesson_cache,
+            user_id=user_id,
+            plan_id=plan.id,
+            lesson_id=lesson.id,
+            profile=profile,
+            roadmap_lesson=roadmap_lesson,
+            week_meta=week_meta,
+        )
+        return normalized
+
+    # Explicit regenerate: wait briefly for Melong, else keep/fallback.
+    rate_limit_llm(request, str(user_id))
     try:
-        raw = await run_interactive_lesson(profile, roadmap_lesson, week_meta)
+        raw = await run_interactive_lesson(
+            profile, roadmap_lesson, week_meta, timeout=35.0, max_tokens=2200
+        )
     except Exception as exc:
-        if cached_body and not regenerate and not lesson_needs_refresh(cached_body):
-            await db.flush()
-            return cached_body
-        if cached_body and regenerate and is_melong_unavailable(exc) and not lesson_needs_refresh(cached_body):
+        if cached_body and is_melong_unavailable(exc) and not lesson_needs_refresh(cached_body):
             await db.flush()
             return cached_body
         if is_melong_unavailable(exc):
@@ -410,14 +446,81 @@ async def get_interactive_lesson(
     return normalized
 
 
+async def _enrich_interactive_lesson_cache(
+    *,
+    user_id: UUID,
+    plan_id: UUID,
+    lesson_id: UUID,
+    profile: dict[str, Any],
+    roadmap_lesson: dict[str, Any],
+    week_meta: dict[str, Any],
+) -> None:
+    """Upgrade a bank lesson with Melong in the background (does not block the learner)."""
+    try:
+        raw = await run_interactive_lesson(
+            profile, roadmap_lesson, week_meta, timeout=35.0, max_tokens=2200
+        )
+    except Exception as exc:
+        logger.info(
+            "Background Melong lesson enrich skipped (%s)",
+            type(exc).__name__,
+        )
+        return
+
+    lid = str(lesson_id)
+    plan_key = str(plan_id)
+    try:
+        async with AsyncSessionLocal() as db:
+            progress = await db.scalar(select(Progress).where(Progress.user_id == user_id))
+            if not progress:
+                return
+            lesson = await db.get(Lesson, lesson_id)
+            if not lesson or lesson.plan_id != plan_id:
+                return
+            modules = _get_modules(progress)
+            cached = modules.get(INTERACTIVE_KEY) or {}
+            plan_cache = cached.get(plan_key) if isinstance(cached, dict) else {}
+            if not isinstance(plan_cache, dict):
+                plan_cache = {}
+            # Don't overwrite a newer Melong cache if learner already regenerated.
+            existing = plan_cache.get(lid)
+            if (
+                isinstance(existing, dict)
+                and existing.get("generated")
+                and not existing.get("offline")
+                and not lesson_needs_refresh(existing)
+            ):
+                return
+            normalized = normalize_interactive_lesson(
+                raw,
+                lesson_id=lid,
+                week_number=lesson.week_number,
+                lesson_type=lesson.lesson_type,
+                fallback_title=lesson.title,
+                roadmap_lesson=roadmap_lesson,
+                week_meta=week_meta,
+                profile=profile,
+            )
+            modules[INTERACTIVE_KEY] = {plan_key: {**plan_cache, lid: normalized}}
+            _set_modules(progress, modules)
+            await db.commit()
+            logger.info("Background Melong lesson enrich saved for %s", lid)
+    except Exception:
+        logger.exception("Background Melong lesson enrich failed to persist")
+
+
 @router.post("/lessons/{lesson_id}/regenerate")
 async def regenerate_interactive_lesson(
     lesson_id: UUID,
+    request: Request,
+    background_tasks: BackgroundTasks,
     user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
     return await get_interactive_lesson(
         lesson_id=lesson_id,
+        request=request,
+        background_tasks=background_tasks,
         regenerate=True,
         user_id=user_id,
         db=db,

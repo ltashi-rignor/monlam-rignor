@@ -12,7 +12,7 @@ async def run_recommendations(
     history: dict[str, Any], catalog: list[dict[str, Any]]
 ) -> dict[str, Any]:
     llm = get_llm()
-    result = llm.complete_json(
+    result = await llm.complete_json_async(
         prompts.recommendation_system(),
         prompts.recommendation_user(history, catalog),
         temperature=0.4,

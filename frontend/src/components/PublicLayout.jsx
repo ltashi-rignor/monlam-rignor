@@ -1,19 +1,26 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
+import ErrorBoundary from './ErrorBoundary'
 import { useI18n } from '../i18n/useI18n'
 import { requireAuth } from '../lib/requireAuth'
 import { toggleTheme, getStoredTheme } from '../lib/theme'
 import { useAuthStore } from '../store/authStore'
 
+const DRAWER_MQ = '(max-width: 1024px)'
+
 export default function PublicLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [isCompact, setIsCompact] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia(DRAWER_MQ).matches : false,
+  )
   const [theme, setTheme] = useState(() => getStoredTheme())
   const { t, lang, setLang, isEn } = useI18n()
   const user = useAuthStore((s) => s.user)
   const logout = useAuthStore((s) => s.logout)
   const navigate = useNavigate()
   const location = useLocation()
+  const titleId = useId()
 
   const nav = [
     { to: '/', label: t.cms.nav.home, end: true },
@@ -32,6 +39,31 @@ export default function PublicLayout() {
     window.scrollTo(0, 0)
   }, [location.pathname])
 
+  useEffect(() => {
+    if (!menuOpen) return undefined
+    const onKey = (e) => {
+      if (e.key === 'Escape') setMenuOpen(false)
+    }
+    document.addEventListener('keydown', onKey)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = prev
+    }
+  }, [menuOpen])
+
+  useEffect(() => {
+    const mq = window.matchMedia(DRAWER_MQ)
+    const onChange = () => {
+      setIsCompact(mq.matches)
+      if (!mq.matches) setMenuOpen(false)
+    }
+    onChange()
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+
   function onStartLearning() {
     requireAuth(navigate, user, '/dashboard')
   }
@@ -42,19 +74,23 @@ export default function PublicLayout() {
     navigate('/')
   }
 
+  function closeMenu() {
+    setMenuOpen(false)
+  }
+
   return (
-    <div className={`cms-shell ${isEn ? 'is-en' : 'is-bo'}`}>
+    <div className={`cms-shell ${isEn ? 'is-en' : 'is-bo'}${menuOpen ? ' is-nav-open' : ''}`}>
       <a className="cms-skip" href="#cms-main">
         {t.cms.skip}
       </a>
       <header className="cms-header">
         <div className="cms-wrap cms-header-inner">
-          <Link to="/" className="cms-brand">
+          <Link to="/" className="cms-brand" onClick={closeMenu}>
             <span className="cms-brand-mark">རིག་ནོར།</span>
             <span className="cms-brand-sub">Rignor</span>
           </Link>
 
-          <nav className={`cms-nav ${menuOpen ? 'is-open' : ''}`} aria-label="Primary">
+          <nav className="cms-nav cms-nav-desktop" aria-label="Primary">
             {nav.map((item) => (
               <NavLink
                 key={item.to}
@@ -65,18 +101,6 @@ export default function PublicLayout() {
                 {item.label}
               </NavLink>
             ))}
-            <div className="cms-nav-auth">
-              {user ? (
-                <>
-                  <Link to="/dashboard">{t.cms.nav.dashboard}</Link>
-                  <button type="button" className="cms-auth-btn" onClick={onLogout}>
-                    {t.signOut}
-                  </button>
-                </>
-              ) : (
-                <Link to="/login">{t.cms.nav.login}</Link>
-              )}
-            </div>
           </nav>
 
           <div className="cms-header-actions">
@@ -120,7 +144,8 @@ export default function PublicLayout() {
               type="button"
               className="cms-burger"
               aria-expanded={menuOpen}
-              aria-label="Menu"
+              aria-controls="cms-drawer"
+              aria-label={menuOpen ? t.cms.nav.closeMenu : t.cms.nav.menu}
               onClick={() => setMenuOpen((v) => !v)}
             >
               <span />
@@ -130,6 +155,62 @@ export default function PublicLayout() {
           </div>
         </div>
       </header>
+
+      <div
+        className="cms-nav-backdrop"
+        hidden={!menuOpen}
+        onClick={closeMenu}
+        aria-hidden="true"
+      />
+
+      <aside
+        id="cms-drawer"
+        className={`cms-drawer ${menuOpen ? 'is-open' : ''}`}
+        aria-labelledby={titleId}
+        aria-hidden={!menuOpen}
+        inert={isCompact && !menuOpen ? true : undefined}
+      >
+        <div className="cms-drawer-head">
+          <p id={titleId} className="cms-brand-mark">
+            རིག་ནོར།
+          </p>
+          <button type="button" className="cms-drawer-close" aria-label={t.cms.nav.closeMenu} onClick={closeMenu}>
+            ×
+          </button>
+        </div>
+        <nav className="cms-drawer-nav" aria-label="Primary">
+          {nav.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              className={({ isActive }) => (isActive ? 'is-active' : '')}
+              onClick={closeMenu}
+            >
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
+        <div className="cms-drawer-auth">
+          {user ? (
+            <>
+              <Link to="/dashboard" onClick={closeMenu}>
+                {t.cms.nav.dashboard}
+              </Link>
+              <button type="button" className="cms-auth-btn" onClick={onLogout}>
+                {t.signOut}
+              </button>
+            </>
+          ) : (
+            <Link to="/login" onClick={closeMenu}>
+              {t.cms.nav.login}
+            </Link>
+          )}
+          <button type="button" className="btn btn-primary" onClick={() => { closeMenu(); onStartLearning() }}>
+            {t.cms.nav.start}
+          </button>
+        </div>
+      </aside>
 
       <AnimatePresence mode="wait">
         <motion.main
@@ -141,7 +222,9 @@ export default function PublicLayout() {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.28 }}
         >
-          <Outlet />
+          <ErrorBoundary>
+            <Outlet />
+          </ErrorBoundary>
         </motion.main>
       </AnimatePresence>
 

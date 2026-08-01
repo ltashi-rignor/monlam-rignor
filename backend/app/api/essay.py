@@ -4,16 +4,16 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agents.essay_agent import run_essay_evaluation
-from app.agents.grammar_agent import run_grammar
-from app.agents.progress_agent import run_progress_update
+from app.core.learner_profile import profile_for_agents
+from app.core.rate_limit import rate_limit_llm
 from app.core.security import get_current_user_id
 from app.database.session import get_db
-from app.models.entities import Essay, Mistake, Progress
+from app.graph.workflow import run_essay_pipeline
+from app.models.entities import Essay, Mistake, Progress, User
 from app.models.schemas import EssayOut, EssaySubmitRequest
 
 router = APIRouter(prefix="/essay", tags=["essay"])
@@ -22,16 +22,34 @@ router = APIRouter(prefix="/essay", tags=["essay"])
 @router.post("/submit", response_model=EssayOut)
 async def submit_essay(
     body: EssaySubmitRequest,
+    request: Request,
     user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
-    grammar_feedback: dict = {}
-    grammar_summary = None
-    if body.run_grammar:
-        grammar_feedback = await run_grammar(db, body.content)
-        grammar_summary = grammar_feedback.get("corrected_version")
+    rate_limit_llm(request, str(user_id))
+    user = await db.get(User, user_id)
+    profile = profile_for_agents(user) if user else {}
 
-    evaluation = await run_essay_evaluation(body.content, grammar_summary)
+    progress = await db.scalar(select(Progress).where(Progress.user_id == user_id))
+    previous = {
+        "grammar_score": progress.grammar_score if progress else 0,
+        "writing_score": progress.writing_score if progress else 0,
+        "reading_score": progress.reading_score if progress else 0,
+        "speaking_score": progress.speaking_score if progress else 0,
+        "vocabulary_score": progress.vocabulary_score if progress else 0,
+        "learning_graph": progress.learning_graph if progress else {},
+    }
+
+    pipeline = await run_essay_pipeline(
+        db,
+        body.content,
+        previous,
+        profile,
+        run_grammar_step=body.run_grammar,
+    )
+    grammar_feedback = pipeline.get("grammar_result") or {}
+    evaluation = pipeline.get("essay_result") or {}
+    updated = pipeline.get("progress_result") or {}
 
     essay = Essay(
         user_id=user_id,
@@ -65,18 +83,6 @@ async def submit_essay(
             )
         )
 
-    progress = await db.scalar(select(Progress).where(Progress.user_id == user_id))
-    previous = {
-        "grammar_score": progress.grammar_score if progress else 0,
-        "writing_score": progress.writing_score if progress else 0,
-        "reading_score": progress.reading_score if progress else 0,
-        "speaking_score": progress.speaking_score if progress else 0,
-        "vocabulary_score": progress.vocabulary_score if progress else 0,
-        "learning_graph": progress.learning_graph if progress else {},
-    }
-    updated = await run_progress_update(
-        {"essay": evaluation, "grammar": grammar_feedback}, previous
-    )
     if progress is None:
         progress = Progress(user_id=user_id)
         db.add(progress)
@@ -97,7 +103,10 @@ async def essay_history(
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
-        select(Essay).where(Essay.user_id == user_id).order_by(Essay.created_at.desc())
+        select(Essay)
+        .where(Essay.user_id == user_id)
+        .order_by(Essay.created_at.desc())
+        .limit(50)
     )
     return list(result.scalars().all())
 

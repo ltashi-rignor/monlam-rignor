@@ -7,11 +7,11 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
+    "check:i18n": "node scripts/scan-i18n-shadow.mjs && node scripts/scan-i18n-keys.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
     "framer-motion": "^12.43.0",
-    "hanzi-writer": "^3.7.3",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.2",

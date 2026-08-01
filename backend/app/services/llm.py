@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from typing import Any
 
@@ -11,6 +12,8 @@ from fastapi import HTTPException
 
 from app.core.config import get_settings
 
+logger = logging.getLogger(__name__)
+
 
 class LLMService:
     def __init__(self) -> None:
@@ -18,11 +21,89 @@ class LLMService:
         self.model = settings.monlam_model
         self.api_url = settings.monlam_chat_url
         self.api_key = settings.monlam_api_key
+        self.max_tokens_cap = settings.llm_max_tokens_cap
         if not self.api_key or self.api_key.startswith("YOUR_"):
             raise HTTPException(
                 status_code=503,
-                detail="MONLAM_API_KEY is missing. Add your Monlam Studio X-API-Key to .env and restart the backend.",
+                detail="AI service is not configured. Please try again later.",
             )
+
+    def _clamp_tokens(self, max_tokens: int) -> int:
+        return max(64, min(int(max_tokens), self.max_tokens_cap))
+
+    def _headers(self) -> dict[str, str]:
+        return {
+            "Content-Type": "application/json",
+            "X-API-Key": self.api_key,
+        }
+
+    def _raise_http(self, response: httpx.Response) -> None:
+        if response.status_code == 401:
+            logger.error("Melong rejected API key")
+            raise HTTPException(
+                status_code=502,
+                detail="AI service authentication failed.",
+            )
+        detail = response.text[:500]
+        if response.status_code == 429 or "rate limit" in detail.lower():
+            note_melong_rate_limit()
+            raise HTTPException(
+                status_code=502,
+                detail="AI service is busy. Please try again shortly.",
+            )
+        logger.error("Melong error %s: %s", response.status_code, detail[:200])
+        raise HTTPException(
+            status_code=502,
+            detail="AI service unavailable. Please try again.",
+        )
+
+    def _post_sync(self, payload: dict[str, Any], *, timeout: float = 90.0) -> str:
+        try:
+            with httpx.Client(timeout=timeout) as client:
+                response = client.post(self.api_url, headers=self._headers(), json=payload)
+        except httpx.RequestError as exc:
+            logger.error("Melong request failed: %s", type(exc).__name__)
+            raise HTTPException(
+                status_code=502,
+                detail="AI service unavailable. Please try again.",
+            ) from exc
+
+        if response.status_code >= 400:
+            self._raise_http(response)
+
+        data = response.json()
+        text = extract_assistant_text(data)
+        if not text:
+            raise HTTPException(
+                status_code=502,
+                detail="AI service returned an empty response.",
+            )
+        return text.strip()
+
+    async def _post_async(self, payload: dict[str, Any], *, timeout: float = 90.0) -> str:
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.post(
+                    self.api_url, headers=self._headers(), json=payload
+                )
+        except httpx.RequestError as exc:
+            logger.error("Melong request failed: %s", type(exc).__name__)
+            raise HTTPException(
+                status_code=502,
+                detail="AI service unavailable. Please try again.",
+            ) from exc
+
+        if response.status_code >= 400:
+            self._raise_http(response)
+
+        data = response.json()
+        text = extract_assistant_text(data)
+        if not text:
+            raise HTTPException(
+                status_code=502,
+                detail="AI service returned an empty response.",
+            )
+        return text.strip()
 
     def complete(
         self,
@@ -31,7 +112,10 @@ class LLMService:
         *,
         max_tokens: int = 4096,
         temperature: float = 0.3,
+        timeout: float = 90.0,
     ) -> str:
+        settings = get_settings()
+        user = (user or "")[: settings.llm_max_user_chars]
         payload = {
             "model_name": self.model,
             "messages": [
@@ -39,43 +123,31 @@ class LLMService:
                 {"role": "user", "content": user},
             ],
             "temperature": temperature,
-            "max_tokens": max_tokens,
+            "max_tokens": self._clamp_tokens(max_tokens),
         }
-        headers = {
-            "Content-Type": "application/json",
-            "X-API-Key": self.api_key,
+        return self._post_sync(payload, timeout=timeout)
+
+    async def complete_async(
+        self,
+        system: str,
+        user: str,
+        *,
+        max_tokens: int = 4096,
+        temperature: float = 0.3,
+        timeout: float = 90.0,
+    ) -> str:
+        settings = get_settings()
+        user = (user or "")[: settings.llm_max_user_chars]
+        payload = {
+            "model_name": self.model,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            "temperature": temperature,
+            "max_tokens": self._clamp_tokens(max_tokens),
         }
-        try:
-            with httpx.Client(timeout=120.0) as client:
-                response = client.post(self.api_url, headers=headers, json=payload)
-        except httpx.RequestError as exc:
-            raise HTTPException(
-                status_code=502,
-                detail=f"Monlam Melong request failed: {exc}",
-            ) from exc
-
-        if response.status_code == 401:
-            raise HTTPException(
-                status_code=502,
-                detail="Monlam API key rejected. Check MONLAM_API_KEY in .env.",
-            )
-        if response.status_code >= 400:
-            detail = response.text[:500]
-            if response.status_code == 429 or "rate limit" in detail.lower():
-                note_melong_rate_limit()
-            raise HTTPException(
-                status_code=502,
-                detail=f"Monlam Melong error ({response.status_code}): {detail}",
-            )
-
-        data = response.json()
-        text = extract_assistant_text(data)
-        if not text:
-            raise HTTPException(
-                status_code=502,
-                detail=f"Monlam Melong returned an empty response: {str(data)[:400]}",
-            )
-        return text.strip()
+        return await self._post_async(payload, timeout=timeout)
 
     def complete_messages(
         self,
@@ -83,43 +155,43 @@ class LLMService:
         *,
         max_tokens: int = 1024,
         temperature: float = 0.5,
+        timeout: float = 90.0,
     ) -> str:
+        settings = get_settings()
+        trimmed: list[dict[str, str]] = []
+        for m in messages[-settings.llm_max_messages :]:
+            role = m.get("role") or "user"
+            content = str(m.get("content") or "")[: settings.llm_max_user_chars]
+            trimmed.append({"role": role, "content": content})
         payload = {
             "model_name": self.model,
-            "messages": messages,
+            "messages": trimmed,
             "temperature": temperature,
-            "max_tokens": max_tokens,
+            "max_tokens": self._clamp_tokens(max_tokens),
         }
-        headers = {
-            "Content-Type": "application/json",
-            "X-API-Key": self.api_key,
+        return self._post_sync(payload, timeout=timeout)
+
+    async def complete_messages_async(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        max_tokens: int = 1024,
+        temperature: float = 0.5,
+        timeout: float = 90.0,
+    ) -> str:
+        settings = get_settings()
+        trimmed: list[dict[str, str]] = []
+        for m in messages[-settings.llm_max_messages :]:
+            role = m.get("role") or "user"
+            content = str(m.get("content") or "")[: settings.llm_max_user_chars]
+            trimmed.append({"role": role, "content": content})
+        payload = {
+            "model_name": self.model,
+            "messages": trimmed,
+            "temperature": temperature,
+            "max_tokens": self._clamp_tokens(max_tokens),
         }
-        try:
-            with httpx.Client(timeout=120.0) as client:
-                response = client.post(self.api_url, headers=headers, json=payload)
-        except httpx.RequestError as exc:
-            raise HTTPException(
-                status_code=502,
-                detail=f"Monlam Melong request failed: {exc}",
-            ) from exc
-
-        if response.status_code >= 400:
-            detail = response.text[:500]
-            if response.status_code == 429 or "rate limit" in detail.lower():
-                note_melong_rate_limit()
-            raise HTTPException(
-                status_code=502,
-                detail=f"Monlam Melong error ({response.status_code}): {detail}",
-            )
-
-        data = response.json()
-        text = extract_assistant_text(data)
-        if not text:
-            raise HTTPException(
-                status_code=502,
-                detail=f"Monlam Melong returned an empty response: {str(data)[:400]}",
-            )
-        return text.strip()
+        return await self._post_async(payload, timeout=timeout)
 
     def complete_json(
         self,
@@ -129,6 +201,7 @@ class LLMService:
         max_tokens: int = 8192,
         temperature: float = 0.2,
         retries: int = 1,
+        timeout: float = 90.0,
     ) -> dict[str, Any]:
         last_error: Exception | None = None
         prompt_user = user
@@ -138,6 +211,7 @@ class LLMService:
                 prompt_user,
                 max_tokens=max_tokens,
                 temperature=temperature,
+                timeout=timeout,
             )
             try:
                 return parse_json_response(text)
@@ -147,9 +221,44 @@ class LLMService:
                     f"{user}\n\nYour previous JSON was invalid or truncated. "
                     "Return a shorter valid JSON object only."
                 )
+        logger.error("Melong JSON parse failed: %s", last_error)
         raise HTTPException(
             status_code=502,
-            detail=f"Melong returned invalid JSON: {last_error}",
+            detail="AI service returned invalid data. Please try again.",
+        ) from last_error
+
+    async def complete_json_async(
+        self,
+        system: str,
+        user: str,
+        *,
+        max_tokens: int = 8192,
+        temperature: float = 0.2,
+        retries: int = 1,
+        timeout: float = 90.0,
+    ) -> dict[str, Any]:
+        last_error: Exception | None = None
+        prompt_user = user
+        for _ in range(retries + 1):
+            text = await self.complete_async(
+                system + "\n\nRespond with valid JSON only. No markdown fences.",
+                prompt_user,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                timeout=timeout,
+            )
+            try:
+                return parse_json_response(text)
+            except (json.JSONDecodeError, ValueError) as exc:
+                last_error = exc
+                prompt_user = (
+                    f"{user}\n\nYour previous JSON was invalid or truncated. "
+                    "Return a shorter valid JSON object only."
+                )
+        logger.error("Melong JSON parse failed: %s", last_error)
+        raise HTTPException(
+            status_code=502,
+            detail="AI service returned invalid data. Please try again.",
         ) from last_error
 
 
@@ -160,7 +269,6 @@ def extract_assistant_text(data: Any) -> str:
     if not isinstance(data, dict):
         return str(data)
 
-    # OpenAI-compatible
     choices = data.get("choices")
     if isinstance(choices, list) and choices:
         message = choices[0].get("message") or {}

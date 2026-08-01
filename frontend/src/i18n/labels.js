@@ -1,4 +1,3 @@
-import { bo } from './bo'
 import { useLocaleStore } from '../store/localeStore'
 
 const LESSON_TYPES_BO = {
@@ -120,6 +119,3 @@ export function tibetanOrFallback(text, fallback, locale) {
 export function exerciseCountBo(n, locale) {
   return currentLang(locale) === 'en' ? `${n} exercises` : `དྲི་བ་ ${n}`
 }
-
-// Keep bo import used for any future shared fallbacks
-void bo

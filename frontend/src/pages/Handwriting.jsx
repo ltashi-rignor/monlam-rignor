@@ -6,7 +6,7 @@ import { CONSONANTS } from '../data/tibetan'
 import { getStrokeLesson } from '../data/strokeLessons'
 import traceDoc from '../data/tibetanTraceLetters.json'
 import { normalizeDoc, normalizeBrush, TraceEngine } from '../lib/traceCore'
-import { bo } from '../i18n/bo'
+import { useI18n } from '../i18n/useI18n'
 
 const TRACE_LETTERS = normalizeDoc(traceDoc)
 const TRACE_BRUSH = normalizeBrush(traceDoc.brush)
@@ -18,6 +18,8 @@ function indexForGlyph(glyph) {
 }
 
 export default function Handwriting() {
+  const { t } = useI18n()
+
   const [idx, setIdx] = useState(0)
   const [strokeI, setStrokeI] = useState(0)
   const [strokeN, setStrokeN] = useState(1)
@@ -34,8 +36,8 @@ export default function Handwriting() {
   const traceLetter = BY_GLYPH[letter.letter] || TRACE_LETTERS[indexForGlyph(letter.letter)]
   const tip = lesson.steps[Math.min(strokeI, Math.max(0, lesson.steps.length - 1))]
   const stepLabel = finished
-    ? bo.modules.handLetterDone
-    : `${bo.modules.handStroke} ${Math.min(strokeI + 1, strokeN)}/${strokeN}`
+    ? t.modules.handLetterDone
+    : `${t.modules.handStroke} ${Math.min(strokeI + 1, strokeN)}/${strokeN}`
 
   const fit = useCallback(() => {
     const engine = engineRef.current
@@ -118,8 +120,8 @@ export default function Handwriting() {
     <div className="module-page tibetan hand-page">
       <header className="hand-page-header">
         <div className="hand-page-heading">
-          <p className="module-eyebrow">{bo.modules.handEyebrow}</p>
-          <h1>{bo.modules.handTitle}</h1>
+          <p className="module-eyebrow">{t.modules.handEyebrow}</p>
+          <h1>{t.modules.handTitle}</h1>
         </div>
         <p className="hand-page-sub" dir="ltr">
           Trace each stroke · watch the demo when you need help
@@ -169,15 +171,15 @@ export default function Handwriting() {
 
           <p className="hand-trace-hint">
             {finished
-              ? bo.modules.handLetterDone
+              ? t.modules.handLetterDone
               : demoing
-                ? bo.modules.handReplay
-                : bo.modules.handDrawPrompt}
+                ? t.modules.handReplay
+                : t.modules.handDrawPrompt}
           </p>
 
           <div className="hand-toolbar">
             <button type="button" className="btn btn-ghost" onClick={reset}>
-              {bo.modules.handRestart}
+              {t.modules.handRestart}
             </button>
             <button
               type="button"
@@ -185,21 +187,21 @@ export default function Handwriting() {
               onClick={playDemo}
               disabled={!ready}
             >
-              {bo.modules.handReplay}
+              {t.modules.handReplay}
             </button>
             <div className="hand-toolbar-nav">
               <button type="button" className="btn btn-ghost" onClick={() => goLetter(-1)}>
-                {bo.modules.handPrevLetter}
+                {t.modules.handPrevLetter}
               </button>
               <button type="button" className="btn btn-ghost" onClick={() => goLetter(1)}>
-                {bo.modules.nextLetter}
+                {t.modules.nextLetter}
               </button>
             </div>
           </div>
         </section>
 
         <aside className="hand-coach" aria-label="Stroke guide">
-          <p className="hand-coach-label">{bo.modules.fynnDiagram}</p>
+          <p className="hand-coach-label">{t.modules.fynnDiagram}</p>
           <a
             className="hand-fynn-link"
             href="https://sites.google.com/view/chrisfynn/home/tibetanscriptfonts/howtowritethetibetanscript"
@@ -217,10 +219,10 @@ export default function Handwriting() {
           <div className="hand-coach-tip">
             <p className="module-eyebrow">{stepLabel}</p>
             <p className="hand-tip-bo">
-              {finished ? bo.modules.handPracticeTip : tip?.bo || bo.modules.handDrawPrompt}
+              {finished ? t.modules.handPracticeTip : tip?.bo || t.modules.handDrawPrompt}
             </p>
             <p className="hand-tip-en" dir="ltr">
-              {finished ? bo.modules.handPracticeTipEn : tip?.en || ''}
+              {finished ? t.modules.handPracticeTipEn : tip?.en || ''}
             </p>
           </div>
         </aside>

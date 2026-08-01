@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import { useModuleProgress } from '../hooks/useModuleProgress'
-import { bo } from '../i18n/bo'
+import { useI18n } from '../i18n/useI18n'
 import { statusBo, tibetanOrFallback } from '../i18n/labels'
 
 export default function Lessons() {
+  const { t } = useI18n()
+
   const { progress, refresh } = useModuleProgress()
   const doneSet = progress.completed_lessons || []
   const [lessons, setLessons] = useState([])
@@ -63,49 +65,49 @@ export default function Lessons() {
     <div className="module-page tibetan">
       <header className="page-header">
         <div>
-          <p className="module-eyebrow">{bo.modules.lessonsEyebrow}</p>
-          <h1>{bo.modules.lessonsTitle}</h1>
-          <p>{bo.modules.lessonsSubPath}</p>
+          <p className="module-eyebrow">{t.modules.lessonsEyebrow}</p>
+          <h1>{t.modules.lessonsTitle}</h1>
+          <p>{t.modules.lessonsSubPath}</p>
           {tibetanOrFallback(meta.plan_title, '') && (
             <p className="muted" style={{ marginTop: 8 }}>
-              {bo.modules.fromPath}: {tibetanOrFallback(meta.plan_title, '')} ·{' '}
-              {bo.learningPath.currentWeek} {meta.current_week}
+              {t.modules.fromPath}: {tibetanOrFallback(meta.plan_title, '')} ·{' '}
+              {t.learningPath.currentWeek} {meta.current_week}
             </p>
           )}
         </div>
         <Link className="btn btn-ghost" to="/learning-path">
-          {bo.modules.openPath}
+          {t.modules.openPath}
         </Link>
       </header>
 
       {error && <p className="error">{error}</p>}
 
-      {loading && <div className="empty panel">{bo.loading}</div>}
+      {loading && <div className="empty panel">{t.loading}</div>}
 
       {!loading && meta.message === 'no_plan' && (
         <div className="panel empty tibetan">
-          <p>{bo.modules.needPlan}</p>
+          <p>{t.modules.needPlan}</p>
           <Link className="btn btn-primary" to="/learning-path">
-            {bo.modules.createPlan}
+            {t.modules.createPlan}
           </Link>
         </div>
       )}
 
       {!loading && meta.message !== 'no_plan' && !lessons.length && (
-        <div className="empty panel">{bo.modules.noPathLessons}</div>
+        <div className="empty panel">{t.modules.noPathLessons}</div>
       )}
 
       {!loading && lessons.length > 0 && (
         <div className="path-overview panel" style={{ marginBottom: 16 }}>
           <div className="path-overview-stats">
             <div className="stat-chip">
-              <span>{bo.learningPath.progress}</span>
+              <span>{t.learningPath.progress}</span>
               <strong dir="ltr">
                 {stats.completed}/{stats.total} · {stats.pct}%
               </strong>
             </div>
             <div className="stat-chip">
-              <span>{bo.modules.xp}</span>
+              <span>{t.modules.xp}</span>
               <strong dir="ltr">{progress.xp || 0}</strong>
             </div>
           </div>
@@ -130,10 +132,10 @@ export default function Lessons() {
                 <div className="lesson-row-top">
                   <h3>{title}</h3>
                   <span className="chip">
-                    {bo.learningPath.week} {l.week_number}
+                    {t.learningPath.week} {l.week_number}
                   </span>
                   <span className="chip">{statusBo(done ? 'completed' : l.status || 'pending')}</span>
-                  {l.ready && <span className="chip chip-ready">{bo.modules.ready}</span>}
+                  {l.ready && <span className="chip chip-ready">{t.modules.ready}</span>}
                 </div>
                 {focus && <p className="muted">{focus}</p>}
               </div>

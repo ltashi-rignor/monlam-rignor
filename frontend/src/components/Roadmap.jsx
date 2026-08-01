@@ -1,6 +1,6 @@
 import LessonCard from './LessonCard'
 import { sameLessonId } from '../lib/lessonNav'
-import { bo } from '../i18n/bo'
+import { useI18n } from '../i18n/useI18n'
 import { tibetanOrFallback } from '../i18n/labels'
 
 function weekProgress(lessons) {
@@ -17,7 +17,9 @@ function weekProgress(lessons) {
 }
 
 export default function Roadmap({ weeks, selectedId, onSelectLesson, onOpenLesson }) {
-  if (!weeks?.length) return <div className="empty tibetan">{bo.learningPath.noPlan}</div>
+  const { t } = useI18n()
+
+  if (!weeks?.length) return <div className="empty tibetan">{t.learningPath.noPlan}</div>
 
   return (
     <div className="tibetan roadmap-list">
@@ -32,14 +34,14 @@ export default function Roadmap({ weeks, selectedId, onSelectLesson, onOpenLesso
           <section className="roadmap-week" key={week.week_number}>
             <div className="roadmap-week-head">
               <h3>
-                {bo.learningPath.week} {week.week_number}
+                {t.learningPath.week} {week.week_number}
                 {focus ? `: ${focus}` : ''}
               </h3>
               <div className="roadmap-week-stats">
                 <span dir="ltr">
                   {done}/{total} · {pct}%
                 </span>
-                {pct === 100 && <span className="badge-done">{bo.learningPath.weekComplete}</span>}
+                {pct === 100 && <span className="badge-done">{t.learningPath.weekComplete}</span>}
               </div>
             </div>
             <div className="week-progress-bar" aria-hidden>
@@ -56,7 +58,7 @@ export default function Roadmap({ weeks, selectedId, onSelectLesson, onOpenLesso
               {week.lessons.map((lesson, i) => (
                 <LessonCard
                   key={lesson.id || `${week.week_number}-${lesson.order_index}`}
-                  title={tibetanOrFallback(lesson.title, bo.common.lesson)}
+                  title={tibetanOrFallback(lesson.title, t.common.lesson)}
                   lessonType={lesson.lesson_type}
                   weekNumber={week.week_number}
                   status={lesson.status || 'pending'}

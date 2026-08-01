@@ -50,6 +50,6 @@ frontend/.vite/
 # Docker
 pgdata/
 
-# Design reference (not part of the app ship)
-new-design-main/
+# OCR page caches (png + txt) from grammar ingest
+data/grammar_ocr/
 

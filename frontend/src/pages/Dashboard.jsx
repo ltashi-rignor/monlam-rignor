@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
-import ProgressChart from '../components/ProgressChart'
+import BarChart from '../components/charts/BarChart'
+import LineChart from '../components/charts/LineChart'
+import RadarChart from '../components/charts/RadarChart'
+import RingStat from '../components/charts/RingStat'
 import { useI18n } from '../i18n/useI18n'
 import {
   exerciseCountBo,
@@ -71,14 +74,25 @@ export default function Dashboard() {
     reading_score: data.progress?.reading_score || 0,
     speaking_score: data.progress?.speaking_score || 0,
     vocabulary_score: data.progress?.vocabulary_score || 0,
-    learning_graph: {},
   }
   const weekLessons = data.current_week_lessons || []
   const next = data.next_lesson
   const practice = data.latest_practice
-  const essays = data.recent_essays || []
   const currentWeek = data.roadmap?.current_week || 1
   const roadmapTitle = tibetanOrFallback(data.roadmap?.title, t.dashboard.path, lang)
+  const weekCompletion = data.week_completion || { total: 0, completed: 0 }
+  const practiceScores = (data.practice_scores || []).map((p) => ({
+    date: p.date,
+    value: p.score,
+  }))
+  const activitySeries = data.activity_series || []
+  const skillItems = [
+    { key: 'grammar', label: t.progress.grammar, value: progress.grammar_score },
+    { key: 'writing', label: t.progress.writing, value: progress.writing_score },
+    { key: 'reading', label: t.progress.reading, value: progress.reading_score },
+    { key: 'speaking', label: t.progress.speaking, value: progress.speaking_score },
+    { key: 'vocabulary', label: t.progress.vocabulary, value: progress.vocabulary_score },
+  ]
 
   return (
     <div className={`dash ${isEn ? 'is-en' : 'tibetan'}`} lang={lang}>
@@ -90,24 +104,43 @@ export default function Dashboard() {
           </h1>
           <p>{t.dashboard.sub}</p>
           <div className="dash-profile-chips">
+            {profile.derived_level && (
+              <span className="chip">
+                {t.dashboard.levelLabel} <b>{profile.derived_level}</b>
+              </span>
+            )}
+            {profile.tibetan_variety && (
+              <span className="chip">
+                {t.dashboard.classLabel} <b>{profile.tibetan_variety}</b>
+              </span>
+            )}
+            {profile.native_language && (
+              <span className="chip">
+                {t.dashboard.nativeLabel} <b>{profile.native_language}</b>
+              </span>
+            )}
+            {Array.isArray(profile.goals) && profile.goals.length > 0 && (
+              <span className="chip">
+                {t.dashboard.goalsLabel}{' '}
+                <b>{profile.goals.slice(0, 2).join(', ')}</b>
+              </span>
+            )}
+            {Array.isArray(profile.interests) && profile.interests.length > 0 && (
+              <span className="chip">
+                {t.dashboard.likes} <b>{profile.interests.slice(0, 3).join(', ')}</b>
+              </span>
+            )}
+            {profile.daily_minutes != null && (
+              <span className="chip">
+                {t.dashboard.dailyLabel}{' '}
+                <b dir="ltr">
+                  {profile.daily_minutes === 0 ? '∞' : `${profile.daily_minutes}m`}
+                </b>
+              </span>
+            )}
             {profile.age != null && (
               <span className="chip">
                 {t.dashboard.age} <b dir="ltr">{profile.age}</b>
-              </span>
-            )}
-            {profile.school_class && (
-              <span className="chip">
-                {t.dashboard.classLabel} <b>{profile.school_class}</b>
-              </span>
-            )}
-            {profile.likes && (
-              <span className="chip">
-                {t.dashboard.likes} <b>{profile.likes}</b>
-              </span>
-            )}
-            {profile.favorites && (
-              <span className="chip">
-                {t.dashboard.favorites} <b>{profile.favorites}</b>
               </span>
             )}
           </div>
@@ -132,11 +165,21 @@ export default function Dashboard() {
       </header>
 
       <section className="grid-3 dash-stats">
-        <div className="stat">
-          <div className="label">{t.dashboard.path}</div>
-          <div className="value value-sm">{roadmapTitle}</div>
-          <div className="stat-meta">
-            {t.dashboard.week} <span dir="ltr">{currentWeek}</span>
+        <div className="stat dash-stat-path">
+          <div className="dash-stat-path-row">
+            <div>
+              <div className="label">{t.dashboard.path}</div>
+              <div className="value value-sm">{roadmapTitle}</div>
+              <div className="stat-meta">
+                {t.dashboard.week} <span dir="ltr">{currentWeek}</span>
+              </div>
+            </div>
+            <RingStat
+              completed={weekCompletion.completed}
+              total={weekCompletion.total}
+              label={t.dashboard.weekDone}
+              sublabel={t.dashboard.weekDoneSub}
+            />
           </div>
         </div>
         <div className="stat">
@@ -150,6 +193,51 @@ export default function Dashboard() {
           <div className="value" dir="ltr">
             {Math.round(progress.writing_score)}
           </div>
+        </div>
+      </section>
+
+      <section className="dash-charts">
+        <div className="panel dash-chart-panel">
+          <h3>{t.dashboard.practiceTrend}</h3>
+          {practiceScores.length ? (
+            <LineChart points={practiceScores} isEn={isEn} />
+          ) : (
+            <div className="chart-empty-block">
+              <p className="chart-empty">{t.dashboard.chartEmpty}</p>
+              <Link className="btn btn-primary" to="/practice">
+                {t.dashboard.chartEmptyPractice}
+              </Link>
+            </div>
+          )}
+        </div>
+        <div className="panel dash-chart-panel">
+          <h3>{t.dashboard.activityTrend}</h3>
+          {activitySeries.some(
+            (d) =>
+              (d.practices_completed || 0) + (d.stories || 0) + (d.mistakes || 0) > 0,
+          ) ? (
+            <BarChart
+              days={activitySeries}
+              labels={{
+                practices: t.dashboard.seriesPractice,
+                stories: t.dashboard.seriesStories,
+                mistakes: t.dashboard.seriesMistakes,
+              }}
+              isEn={isEn}
+            />
+          ) : (
+            <div className="chart-empty-block">
+              <p className="chart-empty">{t.dashboard.chartEmpty}</p>
+              <div className="dash-chart-empty-actions">
+                <Link className="btn btn-primary" to="/practice">
+                  {t.dashboard.chartEmptyPractice}
+                </Link>
+                <Link className="btn btn-accent" to="/story">
+                  {t.dashboard.chartEmptyStory}
+                </Link>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
@@ -168,13 +256,13 @@ export default function Dashboard() {
           {next && (
             <div className="dash-next">
               <div className="meta">{t.dashboard.nextUp}</div>
-              <h4 style={{ margin: '6px 0' }}>
+              <h4 className="dash-next-title">
                 {tibetanOrFallback(next.title, t.dashboard.continueLearning, lang)}
               </h4>
               <div className="meta">
                 {lessonTypeBo(next.lesson_type, lang)} · {statusBo(next.status, lang)}
               </div>
-              <Link className="btn btn-primary" to={`/lessons/${next.id}`} style={{ marginTop: 10 }}>
+              <Link className="btn btn-primary dash-next-cta" to={`/lessons/${next.id}`}>
                 {t.learningPath.goToCourse}
               </Link>
             </div>
@@ -199,8 +287,8 @@ export default function Dashboard() {
             <Link className="btn btn-primary" to="/grammar">
               {t.dashboard.checkGrammar}
             </Link>
-            <Link className="btn btn-ghost" to="/essay">
-              {t.dashboard.writeEssay}
+            <Link className="btn btn-ghost" to="/story">
+              {t.nav.story}
             </Link>
             <Link className="btn btn-accent" to="/practice">
               {t.dashboard.todayPractice}
@@ -209,7 +297,18 @@ export default function Dashboard() {
         </section>
 
         <div className="dash-side">
-          <ProgressChart progress={progress} compact />
+          <section className="panel dash-skills-panel">
+            <h3 style={{ marginTop: 0 }}>{t.dashboard.skillsRadar}</h3>
+            <RadarChart skills={skillItems} emptyLabel={t.dashboard.chartEmpty} />
+            <ul className="dash-skill-legend">
+              {skillItems.map((s) => (
+                <li key={s.key}>
+                  <span>{s.label}</span>
+                  <strong dir="ltr">{Math.round(s.value)}</strong>
+                </li>
+              ))}
+            </ul>
+          </section>
 
           <section className="panel">
             <h3 style={{ marginTop: 0 }}>{t.dashboard.activity}</h3>
@@ -255,16 +354,10 @@ export default function Dashboard() {
           </section>
 
           <section className="panel">
-            <h3 style={{ marginTop: 0 }}>{t.dashboard.recentEssays}</h3>
-            {!essays.length && <p className="empty">{t.dashboard.noEssays}</p>}
-            {essays.map((e) => (
-              <div key={e.id} className="dash-essay-row">
-                <strong>{tibetanOrFallback(e.title, t.dashboard.untitled, lang)}</strong>
-                <span dir="ltr">{Math.round(e.overall_score || 0)}</span>
-              </div>
-            ))}
-            <Link className="btn btn-ghost" to="/essay" style={{ marginTop: 10 }}>
-              {t.dashboard.writeEssay}
+            <h3 style={{ marginTop: 0 }}>{t.nav.story}</h3>
+            <p className="muted">{t.story.sub}</p>
+            <Link className="btn btn-primary" to="/story" style={{ marginTop: 10 }}>
+              {t.story.generate}
             </Link>
           </section>
         </div>
