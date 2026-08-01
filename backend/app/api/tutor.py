@@ -91,7 +91,7 @@ class ChatOut(BaseModel):
 
 
 class TTSIn(BaseModel):
-    text: str = Field(min_length=1, max_length=500)
+    text: str = Field(min_length=1, max_length=1200)
     voice_name: str = "lhasa_female"
 
 

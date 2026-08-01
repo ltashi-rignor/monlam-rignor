@@ -93,6 +93,20 @@ export default function Dashboard() {
     { key: 'speaking', label: t.progress.speaking, value: progress.speaking_score },
     { key: 'vocabulary', label: t.progress.vocabulary, value: progress.vocabulary_score },
   ]
+  const hasPracticeScores = practiceScores.length > 0
+  const linePoints = hasPracticeScores
+    ? practiceScores
+    : skillItems.map((s) => ({
+        label: s.label,
+        value: Math.round(s.value || 0),
+      }))
+  const lineTitle = hasPracticeScores
+    ? t.dashboard.practiceTrend
+    : t.dashboard.skillsTrend
+  const activityHasData = activitySeries.some(
+    (d) =>
+      (d.practices_completed || 0) + (d.stories || 0) + (d.mistakes || 0) > 0,
+  )
 
   return (
     <div className={`dash ${isEn ? 'is-en' : 'tibetan'}`} lang={lang}>
@@ -158,6 +172,9 @@ export default function Dashboard() {
           <Link className="btn btn-accent" to="/practice">
             {t.dashboard.todayPractice}
           </Link>
+          <Link className="btn btn-ghost" to="/story">
+            {t.nav.story}
+          </Link>
           <Link className="btn btn-ghost" to="/onboarding">
             {t.dashboard.editProfile}
           </Link>
@@ -189,22 +206,21 @@ export default function Dashboard() {
           </div>
         </div>
         <div className="stat">
-          <div className="label">{t.dashboard.writing}</div>
+          <div className="label">{t.dashboard.speaking}</div>
           <div className="value" dir="ltr">
-            {Math.round(progress.writing_score)}
+            {Math.round(progress.speaking_score)}
           </div>
         </div>
       </section>
 
       <section className="dash-charts">
         <div className="panel dash-chart-panel">
-          <h3>{t.dashboard.practiceTrend}</h3>
-          {practiceScores.length ? (
-            <LineChart points={practiceScores} isEn={isEn} />
-          ) : (
-            <div className="chart-empty-block">
-              <p className="chart-empty">{t.dashboard.chartEmpty}</p>
-              <Link className="btn btn-primary" to="/practice">
+          <h3>{lineTitle}</h3>
+          <LineChart points={linePoints} isEn={isEn} />
+          {!hasPracticeScores && (
+            <div className="chart-hint-row">
+              <p className="chart-empty chart-empty-inline">{t.dashboard.chartHintPractice}</p>
+              <Link className="btn btn-ghost" to="/practice">
                 {t.dashboard.chartEmptyPractice}
               </Link>
             </div>
@@ -212,30 +228,24 @@ export default function Dashboard() {
         </div>
         <div className="panel dash-chart-panel">
           <h3>{t.dashboard.activityTrend}</h3>
-          {activitySeries.some(
-            (d) =>
-              (d.practices_completed || 0) + (d.stories || 0) + (d.mistakes || 0) > 0,
-          ) ? (
-            <BarChart
-              days={activitySeries}
-              labels={{
-                practices: t.dashboard.seriesPractice,
-                stories: t.dashboard.seriesStories,
-                mistakes: t.dashboard.seriesMistakes,
-              }}
-              isEn={isEn}
-            />
-          ) : (
-            <div className="chart-empty-block">
-              <p className="chart-empty">{t.dashboard.chartEmpty}</p>
-              <div className="dash-chart-empty-actions">
-                <Link className="btn btn-primary" to="/practice">
-                  {t.dashboard.chartEmptyPractice}
-                </Link>
-                <Link className="btn btn-accent" to="/story">
-                  {t.dashboard.chartEmptyStory}
-                </Link>
-              </div>
+          <BarChart
+            days={activitySeries}
+            labels={{
+              practices: t.dashboard.seriesPractice,
+              stories: t.dashboard.seriesStories,
+              mistakes: t.dashboard.seriesMistakes,
+            }}
+            emptyLabel={t.dashboard.chartHintActivity}
+            isEn={isEn}
+          />
+          {!activityHasData && (
+            <div className="chart-hint-row">
+              <Link className="btn btn-ghost" to="/practice">
+                {t.dashboard.chartEmptyPractice}
+              </Link>
+              <Link className="btn btn-ghost" to="/story">
+                {t.dashboard.chartEmptyStory}
+              </Link>
             </div>
           )}
         </div>
@@ -322,8 +332,8 @@ export default function Dashboard() {
                 <strong dir="ltr">{data.practice_completed_count}</strong>
               </div>
               <div>
-                <span className="label">{t.dashboard.essays}</span>
-                <strong dir="ltr">{data.essay_count}</strong>
+                <span className="label">{t.dashboard.stories}</span>
+                <strong dir="ltr">{data.story_count ?? data.essay_count ?? 0}</strong>
               </div>
             </div>
           </section>
@@ -349,6 +359,15 @@ export default function Dashboard() {
                 <Link className="btn btn-primary" to="/practice" style={{ marginTop: 10 }}>
                   {t.dashboard.todayPractice}
                 </Link>
+                {practice.completed && next ? (
+                  <Link
+                    className="btn btn-accent"
+                    to={`/lessons/${next.id}`}
+                    style={{ marginTop: 8, marginLeft: 8 }}
+                  >
+                    {t.dashboard.continueLearning}
+                  </Link>
+                ) : null}
               </>
             )}
           </section>

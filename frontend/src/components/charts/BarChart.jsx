@@ -32,10 +32,11 @@ export default function BarChart({
     [days, isEn],
   )
 
-  const hasData = series.some((d) => d.practices + d.stories + d.mistakes > 0)
-  if (!hasData) {
+  if (!series.length) {
     return <p className="chart-empty">{emptyLabel}</p>
   }
+
+  const hasData = series.some((d) => d.practices + d.stories + d.mistakes > 0)
 
   const W = 420
   const H = height
@@ -53,7 +54,7 @@ export default function BarChart({
   const tip = active != null ? series[active] : null
 
   return (
-    <div className="chart-wrap chart-bars">
+    <div className={`chart-wrap chart-bars${!hasData ? ' is-empty' : ''}`}>
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Bar chart" className="chart-svg">
         {[0, 0.5, 1].map((t) => {
           const y = pad.t + innerH * (1 - t)
@@ -84,14 +85,14 @@ export default function BarChart({
               className={active === i ? 'is-active-group' : ''}
             >
               {vals.map((v, vi) => {
-                const h = (v.value / yMax) * innerH
+                const h = hasData ? (v.value / yMax) * innerH : 0
                 const x = gx - (barW * 3 + barGap * 2) / 2 + vi * (barW + barGap)
                 return (
                   <rect
                     key={v.key}
                     className={`chart-bar ${v.className}`}
                     x={x}
-                    y={base - h}
+                    y={base - Math.max(h, hasData && v.value > 0 ? h : 0)}
                     width={barW}
                     height={Math.max(0, h)}
                     rx={2}
@@ -115,7 +116,9 @@ export default function BarChart({
         <span className="chart-legend-item chart-legend-mistake">{labels.mistakes}</span>
       </div>
 
-      {tip && (
+      {!hasData && <p className="chart-empty chart-empty-inline">{emptyLabel}</p>}
+
+      {tip && hasData && (
         <div className="chart-tip-caption" dir="ltr">
           {tip.label}: {tip.practices} · {tip.stories} · {tip.mistakes}
         </div>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { api, clearApiCache } from '../api/client'
 import WorkingProgress from '../components/WorkingProgress'
 import { useI18n } from '../i18n/useI18n'
@@ -65,6 +65,7 @@ function formatWhen(iso) {
 
 export default function Practice() {
   const { t } = useI18n()
+  const [params] = useSearchParams()
 
   const [session, setSession] = useState(null)
   const [history, setHistory] = useState([])
@@ -75,6 +76,8 @@ export default function Practice() {
   const [busyKind, setBusyKind] = useState(null) // 'generate' | 'submit'
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const [reward, setReward] = useState(null)
+  const [nextLesson, setNextLesson] = useState(null)
 
   const exercises = useMemo(() => {
     const list = session?.exercises_json?.exercises
@@ -111,9 +114,17 @@ export default function Practice() {
   }
 
   useEffect(() => {
+    let cancelled = false
+    const focusParam = params.get('focus') || ''
+    const shouldAuto = params.get('auto') === '1'
+    const fromGrammar = params.get('from') === 'grammar'
+
+    if (focusParam) setFocus(focusParam)
+
     ;(async () => {
       try {
         const latest = await api.getLatestPractice()
+        if (cancelled) return
         setSession(latest)
         const list = latest?.exercises_json?.exercises
         if (Array.isArray(list) && list.length) setStep(0)
@@ -123,8 +134,49 @@ export default function Practice() {
       } catch {
         /* empty */
       }
-      await loadHistory()
+      try {
+        const dash = await api.getDashboard()
+        if (!cancelled) setNextLesson(dash?.next_lesson || null)
+      } catch {
+        if (!cancelled) setNextLesson(null)
+      }
+      if (!cancelled) await loadHistory()
+      if (cancelled) return
+
+      if (fromGrammar || shouldAuto) {
+        setMessage(t.practice.fromGrammarHint)
+      }
+      if (!shouldAuto) return
+
+      setBusy(true)
+      setBusyKind('generate')
+      setError('')
+      setReward(null)
+      try {
+        const data = await api.generatePractice(focusParam || null)
+        if (cancelled) return
+        setSession(data)
+        setAnswers({})
+        setStep(0)
+        setMessage(t.practice.ready)
+        clearApiCache('GET:/api/practice')
+        clearApiCache('GET:/api/progress')
+        clearApiCache('GET:/api/dashboard')
+      } catch (err) {
+        if (!cancelled) setError(err.message)
+      } finally {
+        if (!cancelled) {
+          setBusy(false)
+          setBusyKind(null)
+        }
+      }
     })()
+
+    return () => {
+      cancelled = true
+    }
+    // Deep-link params only matter on first mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function generate() {
@@ -132,6 +184,7 @@ export default function Practice() {
     setBusyKind('generate')
     setError('')
     setMessage('')
+    setReward(null)
     try {
       const data = await api.generatePractice(focus || null)
       setSession(data)
@@ -139,6 +192,7 @@ export default function Practice() {
       setStep(0)
       setMessage(t.practice.ready)
       clearApiCache('GET:/api/practice')
+      clearApiCache('GET:/api/progress')
       clearApiCache('GET:/api/dashboard')
       await loadHistory()
     } catch (err) {
@@ -170,11 +224,23 @@ export default function Practice() {
       })
       setSession(updated)
       const score = Math.round(updated.score ?? 0)
-      setMessage(`${t.practice.submitted} ${score}`)
+      const r = updated.exercises_json?.reward || null
+      setReward(r)
+      setMessage(
+        r
+          ? `${t.practice.submitted} ${score} · +${r.xp} XP · ${t.practice.streak} ${r.streak}`
+          : `${t.practice.submitted} ${score}`,
+      )
       clearApiCache('GET:/api/practice')
       clearApiCache('GET:/api/progress')
       clearApiCache('GET:/api/dashboard')
       await loadHistory()
+      try {
+        const dash = await api.getDashboard()
+        setNextLesson(dash?.next_lesson || null)
+      } catch {
+        /* ignore */
+      }
     } catch (err) {
       setError(err.message)
     } finally {
@@ -233,6 +299,40 @@ export default function Practice() {
 
       {error && <p className="error">{error}</p>}
       {message && <p className="success">{message}</p>}
+
+      {reward && session?.completed && (
+        <div className="practice-reward-toast" role="status">
+          <div className="practice-reward-xp" dir="ltr">
+            +{reward.xp} XP
+          </div>
+          <div className="practice-reward-body">
+            <p>
+              {t.practice.streak}: <strong dir="ltr">{reward.streak}</strong>
+              {reward.best_streak ? (
+                <>
+                  {' '}
+                  · {t.practice.bestStreak} <span dir="ltr">{reward.best_streak}</span>
+                </>
+              ) : null}
+            </p>
+            <p className="muted">{t.practice.comeBack}</p>
+            <div className="practice-reward-actions">
+              {nextLesson?.id ? (
+                <Link className="btn btn-primary" to={`/lessons/${nextLesson.id}`}>
+                  {t.practice.nextLesson}
+                </Link>
+              ) : (
+                <Link className="btn btn-primary" to="/learning-path">
+                  {t.practice.viewPath}
+                </Link>
+              )}
+              <Link className="btn btn-ghost" to="/story">
+                {t.nav.story}
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
 
       <WorkingProgress
         active={busyKind === 'generate'}
@@ -401,9 +501,16 @@ export default function Practice() {
                         {busyKind === 'submit' ? t.practice.submitting : t.practice.submit}
                       </button>
                     ) : (
-                      <Link className="btn btn-accent" to="/progress">
-                        {t.practice.seeProgress}
-                      </Link>
+                      <div className="practice-done-actions">
+                        {nextLesson?.id ? (
+                          <Link className="btn btn-accent" to={`/lessons/${nextLesson.id}`}>
+                            {t.practice.nextLesson}
+                          </Link>
+                        ) : null}
+                        <Link className="btn btn-ghost" to="/progress">
+                          {t.practice.seeProgress}
+                        </Link>
+                      </div>
                     )}
                   </div>
                 </div>

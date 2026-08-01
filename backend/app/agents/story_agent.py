@@ -68,6 +68,77 @@ def _normalize_scenes(raw: Any, names: list[str]) -> list[dict[str, str]]:
     ]
 
 
+def _normalize_glossary(raw: Any, scenes: list[dict[str, str]]) -> list[dict[str, str]]:
+    out: list[dict[str, str]] = []
+    seen: set[str] = set()
+    if isinstance(raw, list):
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            word = str(item.get("word") or "").strip()
+            meaning = str(item.get("meaning") or "").strip()
+            if not word or not meaning or word in seen:
+                continue
+            seen.add(word)
+            out.append({"word": word[:40], "meaning": meaning[:160]})
+            if len(out) >= 8:
+                break
+    if out:
+        return out
+    # Fallback: pick short tokens from first scenes
+    for scene in scenes[:3]:
+        for chunk in str(scene.get("text") or "").replace("།", "་").split("་"):
+            token = chunk.strip()
+            if 1 < len(token) <= 6 and token not in seen:
+                seen.add(token)
+                out.append({"word": token, "meaning": "སྒྲུང་ནང་གི་ཚིག"})
+            if len(out) >= 4:
+                return out
+    return out
+
+
+def _normalize_quiz(raw: Any, scenes: list[dict[str, str]], moral: str) -> list[dict[str, Any]]:
+    quiz: list[dict[str, Any]] = []
+    if isinstance(raw, list):
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            prompt = str(item.get("prompt") or "").strip()
+            options_raw = item.get("options") or []
+            if not isinstance(options_raw, list):
+                continue
+            options = [str(o).strip() for o in options_raw if str(o).strip()][:4]
+            answer = str(item.get("answer") or "").strip()
+            if not prompt or len(options) < 2:
+                continue
+            if answer not in options:
+                answer = options[0]
+            quiz.append({"prompt": prompt[:200], "options": options, "answer": answer})
+            if len(quiz) >= 3:
+                break
+    if len(quiz) >= 2:
+        return quiz[:3]
+
+    caption = scenes[0]["caption"] if scenes else "སྒྲུང་།"
+    return [
+        {
+            "prompt": "སྒྲུང་འདིའི་ཐོག་མའི་གནས་ཚུལ་གང་ཡིན།",
+            "options": [caption, "གནམ་གྲུ།", "མཚོ་ཆེན།"],
+            "answer": caption,
+        },
+        {
+            "prompt": "སློབ་བྱ་གང་ཡིན།",
+            "options": [moral[:40] or "གྲོགས་པོ་ཡག་པོ་བྱེད།", "ཁྲོས་པ།", "གཅིག་པུར་སྡོད།"],
+            "answer": moral[:40] or "གྲོགས་པོ་ཡག་པོ་བྱེད།",
+        },
+        {
+            "prompt": "སྒྲུང་འདི་ལ་དགའ་པོ་བྱུང་ངམ།",
+            "options": ["དགའ་པོ་བྱུང་།", "མི་དགའ།", "མི་ཤེས།"],
+            "answer": "དགའ་པོ་བྱུང་།",
+        },
+    ]
+
+
 async def run_kid_story(
     *,
     names: list[str],
@@ -91,7 +162,7 @@ async def run_kid_story(
                 character_count=count,
                 profile=profile,
             ),
-            max_tokens=1800,
+            max_tokens=2200,
         )
     except Exception:
         result = {}
@@ -108,9 +179,35 @@ async def run_kid_story(
         used = [str(x).strip() for x in used if str(x).strip()][:5] or clean_names
 
     scenes = _normalize_scenes(result.get("scenes"), clean_names)
+    glossary = _normalize_glossary(result.get("glossary"), scenes)
+    quiz = _normalize_quiz(result.get("quiz"), scenes, moral)
     return {
         "title": title[:120],
         "moral": moral[:240],
         "characters_used": used,
         "scenes": scenes,
+        "glossary": glossary,
+        "quiz": quiz,
+    }
+
+
+async def define_story_word(word: str) -> dict[str, str]:
+    clean = (word or "").strip()[:40]
+    if not clean:
+        return {"word": "", "meaning": "", "example": ""}
+    try:
+        llm = get_llm()
+        result = await llm.complete_json_async(
+            prompts.story_define_system(),
+            prompts.story_define_user(clean),
+            max_tokens=400,
+        )
+    except Exception:
+        result = {}
+    if not isinstance(result, dict):
+        result = {}
+    return {
+        "word": str(result.get("word") or clean)[:40],
+        "meaning": str(result.get("meaning") or "དོན་འདི་སློབ་སྐབས་ཤེས་ཡོང་།")[:200],
+        "example": str(result.get("example") or "")[:200],
     }

@@ -92,8 +92,10 @@ def score_practice_answers(
     return score, results
 
 
-def _nudge_progress_from_practice(progress: Progress, score: float) -> None:
+def _nudge_progress_from_practice(progress: Progress, score: float) -> dict:
     """Blend today's practice into skill bars so Progress moves without a full Melong refresh."""
+    from datetime import date
+
     blend = 0.18
     s = max(0.0, min(100.0, float(score)))
     progress.grammar_score = round((1 - blend) * float(progress.grammar_score or 0) + blend * s, 1)
@@ -117,9 +119,38 @@ def _nudge_progress_from_practice(progress: Progress, score: float) -> None:
             "avg_score": avg,
         }
     )
+    today = date.today().isoformat()
+    streak = dict(graph.get("practice_streak") or {})
+    last_day = str(streak.get("last_day") or "")
+    current = int(streak.get("current") or 0)
+    best = int(streak.get("best") or 0)
+    if last_day != today:
+        try:
+            prev = date.fromisoformat(last_day) if last_day else None
+        except ValueError:
+            prev = None
+        if prev and (date.fromisoformat(today) - prev).days == 1:
+            current = current + 1
+        else:
+            current = 1
+        best = max(best, current)
+        streak = {"current": current, "best": best, "last_day": today}
+    elif current <= 0:
+        streak = {"current": 1, "best": max(1, best), "last_day": today}
+    graph["practice_streak"] = streak
+    xp_gain = max(5, int(round(s / 10)) * 5)
+    graph["practice_xp"] = int(graph.get("practice_xp") or 0) + xp_gain
     graph["practice_stats"] = stats
+    reward = {
+        "xp": xp_gain,
+        "streak": int(streak.get("current") or 1),
+        "best_streak": int(streak.get("best") or 1),
+        "score": s,
+    }
+    graph["practice_last_reward"] = reward
     progress.learning_graph = graph
     flag_modified(progress, "learning_graph")
+    return reward
 
 
 @router.post("/generate", response_model=PracticeOut)
@@ -199,11 +230,26 @@ async def submit_practice(
         progress = Progress(user_id=user_id, learning_graph={})
         db.add(progress)
         await db.flush()
-    _nudge_progress_from_practice(progress, score)
+    reward = _nudge_progress_from_practice(progress, score)
     # Re-sync stats/activity so Progress page always has practice_stats.
     from app.services.progress_sync import sync_progress_from_activity
 
     await sync_progress_from_activity(db, user_id, progress)
+
+    # Re-apply reward after sync (sync may rebuild graph fields).
+    graph = dict(progress.learning_graph or {})
+    graph["practice_last_reward"] = reward
+    if "practice_streak" not in graph:
+        graph["practice_streak"] = {
+            "current": reward.get("streak") or 1,
+            "best": reward.get("best_streak") or 1,
+        }
+    progress.learning_graph = graph
+    flag_modified(progress, "learning_graph")
+
+    payload["reward"] = reward
+    record.exercises_json = payload
+    flag_modified(record, "exercises_json")
 
     await db.flush()
     await db.refresh(record)

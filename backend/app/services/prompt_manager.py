@@ -465,15 +465,19 @@ def story_system() -> str:
         "Keep language simple, kind, and age-appropriate (roughly ages 5–12). "
         "No violence, fear, or adult themes. "
         f"{LANG_RULE} "
-        "title, moral, each scene text/caption MUST be Tibetan script. "
+        "title, moral, each scene text/caption, glossary meanings, and quiz prompts "
+        "MUST be Tibetan script. "
         "scene_key MUST be exactly one of these English keys: "
         f"{keys}. "
         "Output JSON only: "
         "title (string), "
         "moral (short Tibetan lesson), "
         "characters_used[] (names as given), "
-        "scenes[{scene_key, caption, text}] "
-        "with exactly 4 to 6 scenes. "
+        "scenes[{scene_key, caption, text}] with exactly 4 to 6 scenes, "
+        "glossary[{word, meaning}] with 4 to 8 kid-friendly Tibetan words from the story "
+        "(word = Tibetan lemma as it appears; meaning = short Tibetan gloss), "
+        "quiz[{prompt, options[3 or 4], answer}] with exactly 3 comprehension questions "
+        "(prompt and options in Tibetan; answer must match one option exactly). "
         "Each scene text = 1–3 short Tibetan sentences. "
         "caption = 2–6 Tibetan words naming the moment."
     )
@@ -501,7 +505,24 @@ def story_user(
         f"Character names: {wrap_untrusted('CHARACTER_NAMES', names_line)}"
         f"What they do: {wrap_untrusted('ACTIONS', actions)}"
         f"Setting hint: {wrap_untrusted('SETTING', setting_line)}"
-        "Use the given names. Match tone to age/level when profile is present. "
+        "Include glossary + 3 quiz items. Use the given names. "
+        "Match tone to age/level when profile is present. JSON only."
+    )
+
+
+def story_define_system() -> str:
+    return (
+        "You explain simple Tibetan words for children. "
+        f"{LANG_RULE} "
+        "Output JSON only: word (echo the Tibetan word), meaning (1 short Tibetan sentence), "
+        "example (optional short Tibetan example sentence)."
+    )
+
+
+def story_define_user(word: str) -> str:
+    return (
+        "Explain this Tibetan word for a child learner:\n"
+        f"{wrap_untrusted('WORD', word)}"
         "JSON only."
     )
 

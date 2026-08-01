@@ -31,6 +31,7 @@ const LetterParty = lazy(() => import('./pages/LetterParty'))
 const Tutor = lazy(() => import('./pages/Tutor'))
 const Grammar = lazy(() => import('./pages/Grammar'))
 const Story = lazy(() => import('./pages/Story'))
+const Speak = lazy(() => import('./pages/Speak'))
 const Practice = lazy(() => import('./pages/Practice'))
 const ProgressPage = lazy(() => import('./pages/Progress'))
 
@@ -102,6 +103,7 @@ export default function App() {
               <Route path="/tutor" element={<Tutor />} />
               <Route path="/grammar" element={<Grammar />} />
               <Route path="/story" element={<Story />} />
+              <Route path="/speak" element={<Speak />} />
               <Route path="/essay" element={<Navigate to="/story" replace />} />
               <Route path="/practice" element={<Practice />} />
               <Route path="/progress" element={<ProgressPage />} />

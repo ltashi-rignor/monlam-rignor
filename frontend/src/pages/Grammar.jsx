@@ -132,7 +132,7 @@ export default function Grammar() {
           <h1>{t.grammar.title}</h1>
           <p>{t.grammar.sub}</p>
         </div>
-        <Link className="btn btn-ghost" to="/practice">
+        <Link className="btn btn-ghost" to="/practice?from=grammar">
           {t.grammar.goPractice}
         </Link>
       </header>
@@ -261,7 +261,7 @@ export default function Grammar() {
               <section className="panel recent-mistakes">
                 <div className="recent-head">
                   <h3 style={{ margin: 0 }}>{t.grammar.recent}</h3>
-                  <Link to="/practice">{t.grammar.practiceFromMistakes}</Link>
+                  <Link to="/practice?from=grammar&auto=1">{t.grammar.practiceFromMistakes}</Link>
                 </div>
                 <ul className="recent-list">
                   {recent.map((m) => (

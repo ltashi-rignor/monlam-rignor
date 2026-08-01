@@ -79,7 +79,11 @@ function MistakeCard({ mistake, kind, id, active }) {
         </span>
         <span className="diff-good">{mistake.correction || '—'}</span>
       </div>
-      {explanation && <p className="mistake-explain">{explanation}</p>}
+      {explanation && (
+        <p className="mistake-explain">
+          <strong className="mistake-explain-label">{t.grammar.why}</strong> {explanation}
+        </p>
+      )}
       {rule && (
         <p className="mistake-rule">
           <strong>{t.grammar.rule}</strong> {rule}
@@ -134,8 +138,20 @@ export default function GrammarResult({ result, originalText, onApplyCorrection 
   const listRef = useRef(null)
   const showCorrected =
     !isClean &&
-    result.corrected_version &&
+    Boolean(result?.corrected_version) &&
     result.corrected_version.trim() !== (originalText || '').trim()
+
+  const practiceHref = useMemo(() => {
+    const types = []
+    for (const m of all) {
+      const label = mistakeTypeBo(m.mistake_type)
+      if (label && !types.includes(label)) types.push(label)
+      if (types.length >= 2) break
+    }
+    const q = new URLSearchParams({ from: 'grammar', auto: '1' })
+    if (types.length) q.set('focus', types.join(' · '))
+    return `/practice?${q.toString()}`
+  }, [all])
 
   function focusMistake(index, original) {
     // Prefer exact original match among combined list
@@ -179,6 +195,15 @@ export default function GrammarResult({ result, originalText, onApplyCorrection 
           {isClean && !praise && !summary && (
             <p className="grammar-praise">{t.grammar.noMistakes}</p>
           )}
+        </div>
+      )}
+
+      {!isClean && (
+        <div className="grammar-practice-cta">
+          <p>{t.grammar.practiceMistakesHint}</p>
+          <Link className="btn btn-accent" to={practiceHref}>
+            {t.grammar.practiceTheseMistakes}
+          </Link>
         </div>
       )}
 
@@ -262,8 +287,8 @@ export default function GrammarResult({ result, originalText, onApplyCorrection 
               <PracticePrompt key={i} question={q} index={i} />
             ))}
           </div>
-          <Link className="btn btn-accent" to="/practice" style={{ marginTop: 8 }}>
-            {t.grammar.goPractice}
+          <Link className="btn btn-accent" to={practiceHref} style={{ marginTop: 8 }}>
+            {t.grammar.practiceTheseMistakes}
           </Link>
         </section>
       )}

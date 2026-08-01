@@ -33,6 +33,7 @@ class DashboardSummary(BaseModel):
     mistake_count: int
     practice_completed_count: int
     essay_count: int
+    story_count: int
     activity_series: list[dict[str, Any]]
     practice_scores: list[dict[str, Any]]
     week_completion: dict[str, int]
@@ -305,6 +306,7 @@ async def dashboard_summary(
         mistake_count=int(mistake_count or 0),
         practice_completed_count=int(practice_done or 0),
         essay_count=int(essay_count or 0),
+        story_count=len(kid_stories),
         activity_series=activity_series,
         practice_scores=practice_scores,
         week_completion=week_completion,

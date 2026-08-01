@@ -239,6 +239,7 @@ export const api = {
     request(`/api/grammar/recent-mistakes?limit=${limit}`, { ttl: 20_000 }),
   generateStory: (body) => request('/api/story/generate', { method: 'POST', body }),
   storyHistory: () => request('/api/story/history', { ttl: 15_000 }),
+  defineStoryWord: (word) => request('/api/story/define', { method: 'POST', body: { word } }),
   generatePractice: (focus) =>
     request('/api/practice/generate', { method: 'POST', body: { focus: focus || null } }),
   submitPractice: (body) => request('/api/practice/submit', { method: 'POST', body }),
