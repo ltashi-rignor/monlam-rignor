@@ -291,3 +291,51 @@ class ContentItem(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+class CmsPost(Base):
+    """Public marketing CMS posts — blog, news, FAQ, announcements.
+
+    Ready for a future admin UI; public API only serves published rows.
+    """
+
+    __tablename__ = "cms_posts"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    kind: Mapped[str] = mapped_column(String(32), index=True)  # blog|news|faq|announcement
+    slug: Mapped[str] = mapped_column(String(200), index=True)
+    title_bo: Mapped[str] = mapped_column(String(400))
+    title_en: Mapped[str | None] = mapped_column(String(400), nullable=True)
+    excerpt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    body: Mapped[str] = mapped_column(Text, default="")
+    published: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    published_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    metadata_json: Mapped[dict] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class CmsContactMessage(Base):
+    """Contact form submissions from the public CMS."""
+
+    __tablename__ = "cms_contact_messages"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    name: Mapped[str] = mapped_column(String(200))
+    email: Mapped[str] = mapped_column(String(320))
+    subject: Mapped[str | None] = mapped_column(String(400), nullable=True)
+    message: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )

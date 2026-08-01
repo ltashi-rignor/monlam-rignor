@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import AppLayout from './components/AppLayout'
+import PublicLayout from './components/PublicLayout'
 import Alphabet from './pages/Alphabet'
 import Dashboard from './pages/Dashboard'
 import Essay from './pages/Essay'
@@ -16,6 +17,18 @@ import Onboarding from './pages/Onboarding'
 import Practice from './pages/Practice'
 import ProgressPage from './pages/Progress'
 import Tutor from './pages/Tutor'
+import CmsAbout from './pages/cms/CmsAbout'
+import CmsAi from './pages/cms/CmsAi'
+import CmsBlog from './pages/cms/CmsBlog'
+import CmsBlogPost from './pages/cms/CmsBlogPost'
+import CmsContact from './pages/cms/CmsContact'
+import CmsFaq from './pages/cms/CmsFaq'
+import CmsFeatures from './pages/cms/CmsFeatures'
+import CmsHome from './pages/cms/CmsHome'
+import CmsNews from './pages/cms/CmsNews'
+import CmsNewsPost from './pages/cms/CmsNewsPost'
+import CmsProgramDetail from './pages/cms/CmsProgramDetail'
+import CmsPrograms from './pages/cms/CmsPrograms'
 import { useAuthStore } from './store/authStore'
 
 function ProtectedOnboarding() {
@@ -36,8 +49,24 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route element={<PublicLayout />}>
+          <Route path="/" element={<CmsHome />} />
+          <Route path="/about" element={<CmsAbout />} />
+          <Route path="/features" element={<CmsFeatures />} />
+          <Route path="/programs" element={<CmsPrograms />} />
+          <Route path="/programs/:slug" element={<CmsProgramDetail />} />
+          <Route path="/ai" element={<CmsAi />} />
+          <Route path="/blog" element={<CmsBlog />} />
+          <Route path="/blog/:slug" element={<CmsBlogPost />} />
+          <Route path="/news" element={<CmsNews />} />
+          <Route path="/news/:slug" element={<CmsNewsPost />} />
+          <Route path="/faq" element={<CmsFaq />} />
+          <Route path="/contact" element={<CmsContact />} />
+        </Route>
+
         <Route path="/login" element={<Login />} />
         <Route path="/onboarding" element={<ProtectedOnboarding />} />
+
         <Route element={<AppLayout />}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/learning-path" element={<LearningPath />} />
@@ -53,7 +82,8 @@ export default function App() {
           <Route path="/practice" element={<Practice />} />
           <Route path="/progress" element={<ProgressPage />} />
         </Route>
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   )

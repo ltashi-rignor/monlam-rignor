@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import ProgressChart from '../components/ProgressChart'
-import { bo } from '../i18n/bo'
+import { useI18n } from '../i18n/useI18n'
 import {
   exerciseCountBo,
   lessonTypeBo,
@@ -12,6 +12,7 @@ import {
 import { useAuthStore } from '../store/authStore'
 
 export default function Dashboard() {
+  const { t, isEn, lang } = useI18n()
   const storeUser = useAuthStore((s) => s.user)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -24,11 +25,11 @@ export default function Dashboard() {
       const summary = await api.getDashboard()
       setData(summary)
     } catch (err) {
-      setError(err.message || bo.dashboard.retry)
+      setError(err.message || t.dashboard.retry)
     } finally {
       setLoading(false)
     }
-  }, [data])
+  }, [data, t.dashboard.retry])
 
   useEffect(() => {
     let cancelled = false
@@ -37,7 +38,7 @@ export default function Dashboard() {
         const summary = await api.getDashboard()
         if (!cancelled) setData(summary)
       } catch (err) {
-        if (!cancelled) setError(err.message || bo.dashboard.retry)
+        if (!cancelled) setError(err.message || t.dashboard.retry)
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -45,18 +46,18 @@ export default function Dashboard() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [t.dashboard.retry])
 
   if (loading && !data) {
-    return <div className="empty tibetan panel">{bo.dashboard.loading}</div>
+    return <div className="empty panel">{t.dashboard.loading}</div>
   }
 
   if (error || !data) {
     return (
-      <div className="tibetan panel">
+      <div className="panel">
         <p className="error">{error || '—'}</p>
         <button type="button" className="btn btn-primary" onClick={load}>
-          {bo.dashboard.retry}
+          {t.dashboard.retry}
         </button>
       </div>
     )
@@ -77,36 +78,36 @@ export default function Dashboard() {
   const practice = data.latest_practice
   const essays = data.recent_essays || []
   const currentWeek = data.roadmap?.current_week || 1
-  const roadmapTitle = tibetanOrFallback(data.roadmap?.title, bo.dashboard.path)
+  const roadmapTitle = tibetanOrFallback(data.roadmap?.title, t.dashboard.path, lang)
 
   return (
-    <div className="tibetan dash" lang="bo">
+    <div className={`dash ${isEn ? 'is-en' : 'tibetan'}`} lang={lang}>
       <header className="page-header dash-hero">
-        <div>
+        <div className="dash-hero-copy">
           <h1>
-            {bo.dashboard.welcome}
+            {t.dashboard.welcome}
             {name ? ` ${name}` : ''}
           </h1>
-          <p>{bo.dashboard.sub}</p>
+          <p>{t.dashboard.sub}</p>
           <div className="dash-profile-chips">
             {profile.age != null && (
               <span className="chip">
-                {bo.dashboard.age} <b dir="ltr">{profile.age}</b>
+                {t.dashboard.age} <b dir="ltr">{profile.age}</b>
               </span>
             )}
             {profile.school_class && (
               <span className="chip">
-                {bo.dashboard.classLabel} <b>{profile.school_class}</b>
+                {t.dashboard.classLabel} <b>{profile.school_class}</b>
               </span>
             )}
             {profile.likes && (
               <span className="chip">
-                {bo.dashboard.likes} <b>{profile.likes}</b>
+                {t.dashboard.likes} <b>{profile.likes}</b>
               </span>
             )}
             {profile.favorites && (
               <span className="chip">
-                {bo.dashboard.favorites} <b>{profile.favorites}</b>
+                {t.dashboard.favorites} <b>{profile.favorites}</b>
               </span>
             )}
           </div>
@@ -114,38 +115,38 @@ export default function Dashboard() {
         <div className="dash-hero-actions">
           {next ? (
             <Link className="btn btn-primary" to={`/lessons/${next.id}`}>
-              {bo.dashboard.continueLearning}
+              {t.dashboard.continueLearning}
             </Link>
           ) : (
             <Link className="btn btn-primary" to="/learning-path">
-              {data.roadmap ? bo.dashboard.viewRoadmap : bo.dashboard.createPlan}
+              {data.roadmap ? t.dashboard.viewRoadmap : t.dashboard.createPlan}
             </Link>
           )}
           <Link className="btn btn-accent" to="/practice">
-            {bo.dashboard.todayPractice}
+            {t.dashboard.todayPractice}
           </Link>
           <Link className="btn btn-ghost" to="/onboarding">
-            {bo.dashboard.editProfile}
+            {t.dashboard.editProfile}
           </Link>
         </div>
       </header>
 
       <section className="grid-3 dash-stats">
         <div className="stat">
-          <div className="label">{bo.dashboard.path}</div>
+          <div className="label">{t.dashboard.path}</div>
           <div className="value value-sm">{roadmapTitle}</div>
           <div className="stat-meta">
-            {bo.dashboard.week} <span dir="ltr">{currentWeek}</span>
+            {t.dashboard.week} <span dir="ltr">{currentWeek}</span>
           </div>
         </div>
         <div className="stat">
-          <div className="label">{bo.dashboard.grammar}</div>
+          <div className="label">{t.dashboard.grammar}</div>
           <div className="value" dir="ltr">
             {Math.round(progress.grammar_score)}
           </div>
         </div>
         <div className="stat">
-          <div className="label">{bo.dashboard.writing}</div>
+          <div className="label">{t.dashboard.writing}</div>
           <div className="value" dir="ltr">
             {Math.round(progress.writing_score)}
           </div>
@@ -156,51 +157,53 @@ export default function Dashboard() {
         <section className="panel">
           <div className="dash-section-head">
             <h3 style={{ margin: 0 }}>
-              {bo.dashboard.thisWeek}{' '}
+              {t.dashboard.thisWeek}{' '}
               <span dir="ltr">({currentWeek})</span>
             </h3>
             <Link className="btn btn-ghost" to="/learning-path">
-              {bo.dashboard.viewRoadmap}
+              {t.dashboard.viewRoadmap}
             </Link>
           </div>
 
           {next && (
             <div className="dash-next">
-              <div className="meta">{bo.dashboard.nextUp}</div>
+              <div className="meta">{t.dashboard.nextUp}</div>
               <h4 style={{ margin: '6px 0' }}>
-                {tibetanOrFallback(next.title, bo.dashboard.continueLearning)}
+                {tibetanOrFallback(next.title, t.dashboard.continueLearning, lang)}
               </h4>
               <div className="meta">
-                {lessonTypeBo(next.lesson_type)} · {statusBo(next.status)}
+                {lessonTypeBo(next.lesson_type, lang)} · {statusBo(next.status, lang)}
               </div>
               <Link className="btn btn-primary" to={`/lessons/${next.id}`} style={{ marginTop: 10 }}>
-                {bo.learningPath.goToCourse}
+                {t.learningPath.goToCourse}
               </Link>
             </div>
           )}
 
-          {!weekLessons.length && <p className="empty">{bo.dashboard.noLessons}</p>}
+          {!weekLessons.length && <p className="empty">{t.dashboard.noLessons}</p>}
 
           <div className="dash-lesson-list">
             {weekLessons.map((lesson) => (
               <Link key={lesson.id} to={`/lessons/${lesson.id}`} className="dash-lesson">
                 <div className="meta">
-                  {lessonTypeBo(lesson.lesson_type)} · {statusBo(lesson.status)}
+                  {lessonTypeBo(lesson.lesson_type, lang)} · {statusBo(lesson.status, lang)}
                 </div>
-                <strong>{tibetanOrFallback(lesson.title, lessonTypeBo(lesson.lesson_type))}</strong>
+                <strong>
+                  {tibetanOrFallback(lesson.title, lessonTypeBo(lesson.lesson_type, lang), lang)}
+                </strong>
               </Link>
             ))}
           </div>
 
           <div className="dash-quick">
             <Link className="btn btn-primary" to="/grammar">
-              {bo.dashboard.checkGrammar}
+              {t.dashboard.checkGrammar}
             </Link>
             <Link className="btn btn-ghost" to="/essay">
-              {bo.dashboard.writeEssay}
+              {t.dashboard.writeEssay}
             </Link>
             <Link className="btn btn-accent" to="/practice">
-              {bo.dashboard.todayPractice}
+              {t.dashboard.todayPractice}
             </Link>
           </div>
         </section>
@@ -209,61 +212,59 @@ export default function Dashboard() {
           <ProgressChart progress={progress} compact />
 
           <section className="panel">
-            <h3 style={{ marginTop: 0 }}>{bo.dashboard.activity}</h3>
+            <h3 style={{ marginTop: 0 }}>{t.dashboard.activity}</h3>
             <div className="dash-activity">
               <div>
-                <span className="label">{bo.dashboard.mistakes}</span>
+                <span className="label">{t.dashboard.mistakes}</span>
                 <strong dir="ltr">{data.mistake_count}</strong>
               </div>
               <div>
-                <span className="label">{bo.dashboard.practicesDone}</span>
+                <span className="label">{t.dashboard.practicesDone}</span>
                 <strong dir="ltr">{data.practice_completed_count}</strong>
               </div>
               <div>
-                <span className="label">{bo.dashboard.essays}</span>
+                <span className="label">{t.dashboard.essays}</span>
                 <strong dir="ltr">{data.essay_count}</strong>
               </div>
             </div>
           </section>
 
           <section className="panel">
-            <h3 style={{ marginTop: 0 }}>{bo.dashboard.practiceStatus}</h3>
-            {!practice && <p className="empty">{bo.dashboard.noPractice}</p>}
+            <h3 style={{ marginTop: 0 }}>{t.dashboard.practiceStatus}</h3>
+            {!practice && <p className="empty">{t.dashboard.noPractice}</p>}
             {practice && (
               <>
-                <strong>
-                  {tibetanOrFallback(practice.title, bo.nav.practice)}
-                </strong>
+                <strong>{tibetanOrFallback(practice.title, t.nav.practice, lang)}</strong>
                 <p className="muted">
-                  {practice.completed ? bo.dashboard.practiceDone : bo.dashboard.practiceOpen}
+                  {practice.completed ? t.dashboard.practiceDone : t.dashboard.practiceOpen}
                   {practice.score != null && (
                     <>
                       {' '}
-                      · {bo.dashboard.score}{' '}
+                      · {t.dashboard.score}{' '}
                       <span dir="ltr">{Math.round(practice.score)}</span>
                     </>
                   )}
                   {' · '}
-                  {exerciseCountBo(practice.exercise_count || 0)}
+                  {exerciseCountBo(practice.exercise_count || 0, lang)}
                 </p>
                 <Link className="btn btn-primary" to="/practice" style={{ marginTop: 10 }}>
-                  {bo.dashboard.todayPractice}
+                  {t.dashboard.todayPractice}
                 </Link>
               </>
             )}
           </section>
 
           <section className="panel">
-            <h3 style={{ marginTop: 0 }}>{bo.dashboard.recentEssays}</h3>
-            {!essays.length && <p className="empty">{bo.dashboard.noEssays}</p>}
+            <h3 style={{ marginTop: 0 }}>{t.dashboard.recentEssays}</h3>
+            {!essays.length && <p className="empty">{t.dashboard.noEssays}</p>}
             {essays.map((e) => (
               <div key={e.id} className="dash-essay-row">
-                <strong>{tibetanOrFallback(e.title, bo.dashboard.untitled)}</strong>
+                <strong>{tibetanOrFallback(e.title, t.dashboard.untitled, lang)}</strong>
                 <span dir="ltr">{Math.round(e.overall_score || 0)}</span>
               </div>
             ))}
             <Link className="btn btn-ghost" to="/essay" style={{ marginTop: 10 }}>
-              {bo.dashboard.writeEssay}
+              {t.dashboard.writeEssay}
             </Link>
           </section>
         </div>

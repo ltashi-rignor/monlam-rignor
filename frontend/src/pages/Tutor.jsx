@@ -368,7 +368,15 @@ export default function Tutor() {
         nextMsgs.map(({ role, content }) => ({ role, content })),
         'text',
       )
-      setMessages([...nextMsgs, { role: 'assistant', content: data.reply || '…' }])
+      setMessages([
+        ...nextMsgs,
+        {
+          role: 'assistant',
+          content: data.reply || '…',
+          usedRag: !!data.used_rag,
+          sources: data.retrieved_sources || [],
+        },
+      ])
     } catch (e) {
       setErr(e.message)
     } finally {
@@ -486,7 +494,12 @@ export default function Tutor() {
             {messages.map((m, i) => (
               <div key={i} className={`tutor-msg ${m.role === 'user' ? 'is-user' : 'is-ai'}`}>
                 <div className="tutor-avatar">{m.role === 'user' ? 'ཁྱེད།' : 'བློ།'}</div>
-                <div className="tutor-bubble tibetan">{m.content}</div>
+                <div className="tutor-bubble-wrap">
+                  <div className="tutor-bubble tibetan">{m.content}</div>
+                  {m.role === 'assistant' && m.usedRag && (
+                    <p className="tutor-rag-note muted">{bo.modules.tutorFromHandbook}</p>
+                  )}
+                </div>
               </div>
             ))}
             {busy && (

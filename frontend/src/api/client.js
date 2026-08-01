@@ -30,6 +30,30 @@ function cacheKey(path, method) {
   return `${method}:${path}`
 }
 
+function isPublicPath(pathname) {
+  const path = pathname || ''
+  return (
+    path === '/' ||
+    path.startsWith('/about') ||
+    path.startsWith('/features') ||
+    path.startsWith('/programs') ||
+    path.startsWith('/ai') ||
+    path.startsWith('/blog') ||
+    path.startsWith('/news') ||
+    path.startsWith('/faq') ||
+    path.startsWith('/contact') ||
+    path.startsWith('/login')
+  )
+}
+
+function redirectToLoginOn401() {
+  setToken(null)
+  const path = window.location.pathname || ''
+  if (isPublicPath(path)) return
+  const next = `${path}${window.location.search || ''}`
+  window.location.href = `/login?next=${encodeURIComponent(next)}`
+}
+
 async function request(path, options = {}) {
   const method = (options.method || 'GET').toUpperCase()
   const headers = {
@@ -61,10 +85,7 @@ async function request(path, options = {}) {
     })
 
     if (res.status === 401) {
-      setToken(null)
-      if (!window.location.pathname.startsWith('/login')) {
-        window.location.href = '/login'
-      }
+      redirectToLoginOn401()
     }
 
     const data = await res.json().catch(() => ({}))
@@ -165,10 +186,7 @@ export const api = {
       body: form,
     })
     if (res.status === 401) {
-      setToken(null)
-      if (!window.location.pathname.startsWith('/login')) {
-        window.location.href = '/login'
-      }
+      redirectToLoginOn401()
     }
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
@@ -184,4 +202,16 @@ export const api = {
       body: { theme, count, difficulty, exclude },
       ttl: 0,
     }),
+  cmsPosts: (kind, limit = 20, offset = 0) =>
+    request(`/api/cms/posts?kind=${encodeURIComponent(kind)}&limit=${limit}&offset=${offset}`, {
+      ttl: 60_000,
+    }),
+  cmsPost: (kind, slug) =>
+    request(`/api/cms/posts/${encodeURIComponent(slug)}?kind=${encodeURIComponent(kind)}`, {
+      ttl: 60_000,
+    }),
+  cmsAnnouncements: (limit = 5) =>
+    request(`/api/cms/announcements?limit=${limit}`, { ttl: 60_000 }),
+  cmsStats: () => request('/api/cms/stats', { ttl: 120_000 }),
+  cmsContact: (body) => request('/api/cms/contact', { method: 'POST', body }),
 }

@@ -1,6 +1,7 @@
 import { bo } from './bo'
+import { useLocaleStore } from '../store/localeStore'
 
-const LESSON_TYPES = {
+const LESSON_TYPES_BO = {
   alphabet: 'གསལ་བྱེད།',
   vocabulary: 'མིང་ཚིག',
   grammar: 'བརྡ་སྤྲོད།',
@@ -15,7 +16,22 @@ const LESSON_TYPES = {
   flashcards: 'ཤོག་བུ།',
 }
 
-const STATUSES = {
+const LESSON_TYPES_EN = {
+  alphabet: 'Alphabet',
+  vocabulary: 'Vocabulary',
+  grammar: 'Grammar',
+  reading: 'Reading',
+  writing: 'Writing',
+  speaking: 'Speaking',
+  practice: 'Practice',
+  quiz: 'Quiz',
+  lesson: 'Lesson',
+  game: 'Game',
+  handwriting: 'Handwriting',
+  flashcards: 'Flashcards',
+}
+
+const STATUSES_BO = {
   pending: 'མ་ཚར།',
   planned: 'འཆར་གཞི།',
   in_progress: 'འགུལ་བཞིན།',
@@ -24,15 +40,16 @@ const STATUSES = {
   archived: 'ཉར་ཚགས།',
 }
 
-/** True if string is mostly Latin (Melong English leftovers). */
-export function looksEnglish(text) {
-  if (!text || typeof text !== 'string') return false
-  const tibetan = (text.match(/[\u0F00-\u0FFF]/g) || []).join('').length
-  const latin = (text.match(/[A-Za-z]/g) || []).join('').length
-  return latin > 3 && latin >= tibetan
+const STATUSES_EN = {
+  pending: 'Pending',
+  planned: 'Planned',
+  in_progress: 'In progress',
+  active: 'Active',
+  completed: 'Done',
+  archived: 'Archived',
 }
 
-const MISTAKE_TYPES = {
+const MISTAKE_TYPES_BO = {
   grammar: 'བརྡ་སྤྲོད།',
   particle: 'ཕྲད།',
   honorific: 'ཞེ་ས།',
@@ -44,31 +61,65 @@ const MISTAKE_TYPES = {
   syntax: 'ཚིག་སྦྱོར།',
 }
 
-export function mistakeTypeBo(type) {
-  if (!type) return MISTAKE_TYPES.grammar
-  if (!looksEnglish(type)) return type
-  const key = String(type).toLowerCase().trim()
-  return MISTAKE_TYPES[key] || MISTAKE_TYPES.grammar
+const MISTAKE_TYPES_EN = {
+  grammar: 'Grammar',
+  particle: 'Particle',
+  honorific: 'Honorific',
+  case: 'Case',
+  spelling: 'Spelling',
+  vocabulary: 'Vocabulary',
+  verb: 'Verb',
+  punctuation: 'Punctuation',
+  syntax: 'Syntax',
 }
 
-export function lessonTypeBo(type) {
-  if (!type) return LESSON_TYPES.lesson
-  const key = String(type).toLowerCase().trim()
-  return LESSON_TYPES[key] || type
+function currentLang(override) {
+  const v = override ?? useLocaleStore.getState().lang
+  return v === 'en' ? 'en' : 'bo'
 }
 
-export function statusBo(status) {
+/** True if string is mostly Latin (Melong English leftovers). */
+export function looksEnglish(text) {
+  if (!text || typeof text !== 'string') return false
+  const tibetan = (text.match(/[\u0F00-\u0FFF]/g) || []).join('').length
+  const latin = (text.match(/[A-Za-z]/g) || []).join('').length
+  return latin > 3 && latin >= tibetan
+}
+
+export function mistakeTypeBo(type, locale) {
+  const l = currentLang(locale)
+  const map = l === 'en' ? MISTAKE_TYPES_EN : MISTAKE_TYPES_BO
+  if (!type) return map.grammar
+  if (!looksEnglish(type) && l === 'bo') return type
+  const key = String(type).toLowerCase().trim()
+  return map[key] || map.grammar
+}
+
+export function lessonTypeBo(type, locale) {
+  const map = currentLang(locale) === 'en' ? LESSON_TYPES_EN : LESSON_TYPES_BO
+  if (!type) return map.lesson
+  const key = String(type).toLowerCase().trim()
+  return map[key] || type
+}
+
+export function statusBo(status, locale) {
   if (!status) return ''
+  const map = currentLang(locale) === 'en' ? STATUSES_EN : STATUSES_BO
   const key = String(status).toLowerCase().trim()
-  return STATUSES[key] || status
+  return map[key] || status
 }
 
-export function tibetanOrFallback(text, fallback) {
+export function tibetanOrFallback(text, fallback, locale) {
   if (!text) return fallback
+  // In English UI, prefer the provided title even if Latin
+  if (currentLang(locale) === 'en') return text
   if (looksEnglish(text)) return fallback
   return text
 }
 
-export function exerciseCountBo(n) {
-  return `དྲི་བ་ ${n}`
+export function exerciseCountBo(n, locale) {
+  return currentLang(locale) === 'en' ? `${n} exercises` : `དྲི་བ་ ${n}`
 }
+
+// Keep bo import used for any future shared fallbacks
+void bo

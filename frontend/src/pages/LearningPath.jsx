@@ -5,7 +5,7 @@ import LessonDetail from '../components/LessonDetail'
 import PathGraph from '../components/PathGraph'
 import Roadmap from '../components/Roadmap'
 import { lessonDestination, isActivityLesson, lessonTypeGlyph } from '../lib/lessonNav'
-import { bo } from '../i18n/bo'
+import { useI18n } from '../i18n/useI18n'
 import { lessonTypeBo, statusBo, tibetanOrFallback } from '../i18n/labels'
 
 function buildWeeks(plan) {
@@ -56,6 +56,7 @@ function buildWeeks(plan) {
 }
 
 export default function LearningPath() {
+  const { t, isEn, lang } = useI18n()
   const navigate = useNavigate()
   const [plan, setPlan] = useState(null)
   const [error, setError] = useState('')
@@ -252,7 +253,7 @@ export default function LearningPath() {
     if (!target) return
     const href = lessonDestination(target)
     if (!href) {
-      setError(bo.learningPath.needRegen)
+      setError(t.learningPath.needRegen)
       selectLesson(target)
       return
     }
@@ -262,18 +263,18 @@ export default function LearningPath() {
 
   if (noPlan && !plan) {
     return (
-      <div className="tibetan learning-path-page">
+      <div className={`learning-path-page ${isEn ? 'is-en' : 'tibetan'}`}>
         <header className="page-header">
           <div>
-            <h1>{bo.learningPath.title}</h1>
-            <p>{bo.learningPath.sub}</p>
+            <h1>{t.learningPath.title}</h1>
+            <p>{t.learningPath.sub}</p>
           </div>
         </header>
         {error && <p className="error">{error}</p>}
         <div className="panel empty">
-          <p>{bo.learningPath.noPlan}</p>
+          <p>{t.learningPath.noPlan}</p>
           <button className="btn btn-primary" onClick={() => regenerate(false)} disabled={busy}>
-            {busy ? bo.learningPath.creating : bo.learningPath.createFirst}
+            {busy ? t.learningPath.creating : t.learningPath.createFirst}
           </button>
         </div>
       </div>
@@ -281,11 +282,11 @@ export default function LearningPath() {
   }
 
   return (
-    <div className="tibetan learning-path-page">
+    <div className={`learning-path-page ${isEn ? 'is-en' : 'tibetan'}`}>
       <header className="page-header">
         <div>
-          <h1>{bo.learningPath.title}</h1>
-          <p>{bo.learningPath.sub}</p>
+          <h1>{t.learningPath.title}</h1>
+          <p>{t.learningPath.sub}</p>
         </div>
         <div className="path-header-actions">
           {continueLesson && (
@@ -294,11 +295,11 @@ export default function LearningPath() {
               className="btn btn-accent"
               onClick={() => openLesson(continueLesson)}
             >
-              {bo.modules.continue}
+              {t.modules.continue}
             </button>
           )}
           <button className="btn btn-primary" onClick={() => regenerate(true)} disabled={busy}>
-            {busy ? bo.learningPath.regenerating : bo.learningPath.regenerate}
+            {busy ? t.learningPath.regenerating : t.learningPath.regenerate}
           </button>
         </div>
       </header>
@@ -309,32 +310,32 @@ export default function LearningPath() {
         <div className="path-overview panel path-hero-stage">
           <div>
             <h2 style={{ margin: '0 0 6px' }}>
-              {tibetanOrFallback(plan.title, bo.learningPath.title)}
+              {tibetanOrFallback(plan.title, t.learningPath.title, lang)}
             </h2>
-            {tibetanOrFallback(plan.roadmap_json?.summary, '') && (
+            {tibetanOrFallback(plan.roadmap_json?.summary, '', lang) && (
               <p className="muted" style={{ margin: 0 }}>
-                {tibetanOrFallback(plan.roadmap_json.summary, '')}
+                {tibetanOrFallback(plan.roadmap_json.summary, '', lang)}
               </p>
             )}
           </div>
           <div className="path-overview-stats">
             <div className="stat-chip">
-              <span>{bo.learningPath.currentWeek}</span>
+              <span>{t.learningPath.currentWeek}</span>
               <strong dir="ltr">{plan.current_week}</strong>
             </div>
             <div className="stat-chip">
-              <span>{bo.learningPath.status}</span>
-              <strong>{statusBo(plan.status)}</strong>
+              <span>{t.learningPath.status}</span>
+              <strong>{statusBo(plan.status, lang)}</strong>
             </div>
             <div className="stat-chip">
-              <span>{bo.learningPath.progress}</span>
+              <span>{t.learningPath.progress}</span>
               <strong dir="ltr">
                 {stats.completed}/{stats.total} · {stats.pct}%
               </strong>
             </div>
             {stats.inProgress > 0 && (
               <div className="stat-chip">
-                <span>{statusBo('in_progress')}</span>
+                <span>{statusBo('in_progress', lang)}</span>
                 <strong dir="ltr">{stats.inProgress}</strong>
               </div>
             )}
@@ -351,13 +352,14 @@ export default function LearningPath() {
               <div className="path-now-playing-body">
                 <p className="path-now-label">
                   <span className="path-live-dot" aria-hidden />
-                  {bo.learningPath.nowPlaying}
+                  {t.learningPath.nowPlaying}
                 </p>
-                <h3>{tibetanOrFallback(continueLesson.title, bo.common.lesson)}</h3>
+                <h3>{tibetanOrFallback(continueLesson.title, t.common.lesson, lang)}</h3>
                 <p className="meta">
-                  {lessonTypeBo(continueLesson.lesson_type)} · {statusBo(continueLesson.status)}
+                  {lessonTypeBo(continueLesson.lesson_type, lang)} ·{' '}
+                  {statusBo(continueLesson.status, lang)}
                   {continueLesson.estimated_minutes != null
-                    ? ` · ~${continueLesson.estimated_minutes} ${bo.learningPath.minutes}`
+                    ? ` · ~${continueLesson.estimated_minutes} ${t.learningPath.minutes}`
                     : ''}
                 </p>
               </div>
@@ -366,7 +368,7 @@ export default function LearningPath() {
                 className="btn btn-primary path-cta-pulse"
                 onClick={() => openLesson(continueLesson)}
               >
-                {bo.learningPath.goToCourse}
+                {t.learningPath.goToCourse}
               </button>
             </div>
           )}

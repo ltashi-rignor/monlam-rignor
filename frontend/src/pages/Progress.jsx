@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
 import ProgressChart from '../components/ProgressChart'
-import { bo } from '../i18n/bo'
+import { useI18n } from '../i18n/useI18n'
 import { tibetanOrFallback } from '../i18n/labels'
 
 export default function ProgressPage() {
+  const { t, isEn } = useI18n()
   const [progress, setProgress] = useState(null)
   const [recs, setRecs] = useState([])
   const [rationale, setRationale] = useState('')
@@ -60,26 +61,26 @@ export default function ProgressPage() {
   }
 
   return (
-    <div className="tibetan">
+    <div className={isEn ? 'is-en' : 'tibetan'}>
       <header className="page-header">
         <div>
-          <h1>{bo.progress.title}</h1>
-          <p>{bo.progress.sub}</p>
+          <h1>{t.progress.title}</h1>
+          <p>{t.progress.sub}</p>
         </div>
         <button className="btn btn-primary" onClick={refresh} disabled={busy}>
-          {busy ? bo.progress.refreshing : bo.progress.refresh}
+          {busy ? t.progress.refreshing : t.progress.refresh}
         </button>
       </header>
       {error && <p className="error">{error}</p>}
       <div className="grid-2">
         <ProgressChart progress={progress} />
         <div className="panel">
-          <h3 style={{ marginTop: 0 }}>{bo.progress.recommendations}</h3>
-          {recsLoading && !recs.length && <p className="muted">{bo.loading}</p>}
+          <h3 style={{ marginTop: 0 }}>{t.progress.recommendations}</h3>
+          {recsLoading && !recs.length && <p className="muted">{t.loading}</p>}
           {tibetanOrFallback(rationale, '') && (
             <p style={{ color: 'var(--muted)' }}>{tibetanOrFallback(rationale, '')}</p>
           )}
-          {!recsLoading && !recs.length && <p className="empty">{bo.progress.noRecs}</p>}
+          {!recsLoading && !recs.length && <p className="empty">{t.progress.noRecs}</p>}
           {recs.map((item, i) => (
             <div key={i} style={{ padding: '12px 0', borderBottom: '1px solid var(--line)' }}>
               <div style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>
@@ -96,13 +97,13 @@ export default function ProgressPage() {
           ))}
           {progress?.learning_graph?.strengths && (
             <div style={{ marginTop: 16 }}>
-              <h4>{bo.progress.strengths}</h4>
+              <h4>{t.progress.strengths}</h4>
               <ul>
                 {(progress.learning_graph.strengths || []).map((s, i) => (
                   <li key={i}>{tibetanOrFallback(s, s)}</li>
                 ))}
               </ul>
-              <h4>{bo.progress.weaknesses}</h4>
+              <h4>{t.progress.weaknesses}</h4>
               <ul>
                 {(progress.learning_graph.weaknesses || []).map((s, i) => (
                   <li key={i}>{tibetanOrFallback(s, s)}</li>

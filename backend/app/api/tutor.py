@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any, Literal
 from uuid import UUID
@@ -9,10 +10,15 @@ from uuid import UUID
 import httpx
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.security import get_current_user_id
+from app.database.session import get_db
+from app.rag.retriever import get_retriever
 from app.services.llm import get_llm
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/tutor", tags=["tutor"])
 
@@ -26,41 +32,74 @@ _TTS_VOICES = {
 }
 
 TUTOR_SYSTEM = (
-    "You are རིག་ནུས་དགེ་རྒན།, a warm and accurate Tibetan language tutor on Rignor(རིག་ནོར།) "
-    "(རིག་ནོར།). Teach standard school / literary Tibetan carefully. "
-    "Always answer the learner's actual question first with correct Tibetan. "
-    "When teaching, include: (1) Tibetan script, (2) Wylie or simple phonetics, "
-    "(3) clear meaning, (4) a short grammar or usage note when useful. "
-    "If the learner writes in Tibetan, reply mainly in Tibetan; otherwise bilingual is fine. "
-    "Keep replies focused (about 80–120 words). Never invent Tibetan words or fake grammar. "
-    "If you are unsure, say so briefly and give the safest standard form."
+    "You are རིག་ནུས་དགེ་རྒན།, a warm and accurate Tibetan language tutor on Rignor (རིག་ནོར།).\n"
+    "Teach standard school / literary Tibetan carefully.\n\n"
+    "LANGUAGE:\n"
+    "- Always reply in Tibetan script as the main answer.\n"
+    "- Keep English minimal: at most a short gloss when the learner asks in English "
+    "or explicitly wants an English meaning — never make English the whole reply.\n\n"
+    "ANSWERING:\n"
+    "- Answer the learner's actual latest question first with correct Tibetan.\n"
+    "- When teaching a word or phrase, include: (1) Tibetan, (2) simple phonetics or Wylie, "
+    "(3) clear meaning, (4) a short usage note when useful.\n"
+    "- Keep replies focused (about 80–120 words). Never invent Tibetan words or fake grammar.\n"
+    "- If unsure, say so briefly and give the safest standard form.\n\n"
+    "GRAMMAR (བརྡ་སྤྲོད།):\n"
+    "- When handbook passages are provided below, ground your explanation in those passages. "
+    "Do not invent rules that contradict them.\n"
+    "- Structure: rule in plain Tibetan → one clear example → optional short check question.\n"
 )
 
 VOICE_TUTOR_SYSTEM = (
     "You are རིག་ནུས་དགེ་རྒན། on a live voice call in Rignor (རིག་ནོར།). "
     "You are a real Tibetan grammar and language tutor. Speak Tibetan only "
     "(unless they explicitly ask for one English gloss).\n\n"
-
     "MOST IMPORTANT — answer THIS turn:\n"
     "- Read the learner's LATEST message carefully and answer THAT question.\n"
     "- Never repeat, recycle, or lightly rephrase your previous reply. Each turn must be new.\n"
     "- Do not fall back to greetings, 'what shall we study?', or the same canned tip.\n"
     "- If they say they already heard that / ask again / ask a follow-up, go deeper or give a "
     "different example — do not say the same thing again.\n\n"
-
     "WHEN THEY ASK ABOUT GRAMMAR (བརྡ་སྤྲོད། / particles / verb endings / cases / etc.):\n"
-    "- Teach the specific point they asked about.\n"
+    "- If handbook passages are provided, teach from those passages — do not invent rules.\n"
     "- Structure: (1) name the rule in plain Tibetan, (2) give ONE clear example sentence, "
     "(3) optionally ask one short check question.\n"
-    "- If the topic is broad ('teach me grammar'), pick ONE beginner topic (e.g. འི་ / གི་ / ཀྱི་ "
-    "genitive, or ལ་ particle) and teach that — then invite the next topic. Do not stay stuck "
-    "on the same particle forever.\n\n"
-
+    "- If the topic is broad ('teach me grammar'), pick ONE beginner topic from the handbook "
+    "context (or འི་ / གི་ / ཀྱི་ / ལ་) and teach that — then invite the next topic.\n\n"
     "OTHER QUESTIONS: answer directly first; one tiny tip only if useful.\n"
     "STT may garble words — silently repair likely errors; if still unclear, ask ONE clarifying question.\n"
     "Real vocabulary and grammar only. Never invent forms.\n"
     "Style: 2–4 short spoken sentences. No markdown, bullets, emoji, Wylie, or fillers like "
     "ཨེ། / འོང་། / ཨང་། (the app plays those separately).\n"
+)
+
+# Keywords that trigger grammar-handbook RAG (Tibetan + common English).
+_GRAMMAR_HINTS = (
+    "བརྡ་སྤྲོད",
+    "བརྡསྤྲོད",
+    "ཕྲད",
+    "རྣམ་དབྱེ",
+    "རྣམདབྱེ",
+    "ཞེ་ས",
+    "ཞེས",
+    "བྱ་ཚིག",
+    "མིང་ཚིག",
+    "སམ",
+    "འབྲེལ་སྒྲ",
+    "ལས་སྒྲ",
+    "བྱེད་སྒྲ",
+    "grammar",
+    "particle",
+    "particles",
+    "genitive",
+    "honorific",
+    "verb ending",
+    "case ending",
+    "ཀྱི་",
+    "གི་",
+    "གྱི་",
+    "ཡི་",
+    "འི་",
 )
 
 
@@ -76,8 +115,18 @@ class ChatIn(BaseModel):
     mode: Literal["text", "voice"] = "text"
 
 
+class RetrievedSource(BaseModel):
+    page_number: int | None = None
+    title: str | None = None
+    source_name: str | None = None
+    score: float | None = None
+    excerpt: str | None = None
+
+
 class ChatOut(BaseModel):
     reply: str
+    retrieved_sources: list[RetrievedSource] = Field(default_factory=list)
+    used_rag: bool = False
 
 
 class TTSIn(BaseModel):
@@ -133,20 +182,96 @@ def _too_similar(a: str, b: str) -> bool:
     return False
 
 
+def _latest_user_text(messages: list[ChatMessage]) -> str:
+    for m in reversed(messages):
+        if m.role == "user" and m.content.strip():
+            return m.content.strip()
+    return ""
+
+
+def _is_grammar_query(text: str) -> bool:
+    if not text:
+        return False
+    lowered = text.lower()
+    for hint in _GRAMMAR_HINTS:
+        if hint.lower() in lowered or hint in text:
+            return True
+    # Short particle-style questions
+    compact = _norm_bo(text)
+    if len(compact) <= 40 and any(p in text for p in ("ལ་", "ནས་", "དུ་", "སུ་", "རུ་", "ཏུ་")):
+        if any(w in text for w in ("ཇི་", "ག་རེ", "how", "what", "when", "use", "སྤྱོད", "དོན")):
+            return True
+    return False
+
+
+def _format_handbook_context(retrieved: list[dict[str, Any]]) -> str:
+    blocks: list[str] = []
+    for r in retrieved:
+        page = r.get("page_number")
+        title = r.get("title") or "བོད་ཡིག་བརྡ་སྤྲོད་དཔེ་དེབ།"
+        content = (r.get("content") or "").strip()
+        if not content:
+            continue
+        label = f"p.{page}" if page is not None else title
+        blocks.append(f"[Handbook {label}] {content[:1800]}")
+    if not blocks:
+        return ""
+    return (
+        "GRAMMAR HANDBOOK PASSAGES (use these; do not invent conflicting rules):\n"
+        + "\n\n".join(blocks)
+    )
+
+
+def _sources_payload(retrieved: list[dict[str, Any]]) -> list[RetrievedSource]:
+    return [
+        RetrievedSource(
+            page_number=r.get("page_number"),
+            title=r.get("title") or "བོད་ཡིག་བརྡ་སྤྲོད་དཔེ་དེབ།",
+            source_name=r.get("source_name"),
+            score=float(r["score"]) if r.get("score") is not None else None,
+            excerpt=(r.get("content") or "")[:280],
+        )
+        for r in retrieved
+    ]
+
+
+async def _retrieve_grammar_for_tutor(
+    session: AsyncSession, query: str
+) -> list[dict[str, Any]]:
+    q = query.strip()
+    if len(q) < 40:
+        q = f"{q}\nབོད་ཡིག་བརྡ་སྤྲོད། ཕྲད། སམ། རྣམ་དབྱེ། ཞེ་ས།"
+    try:
+        return await get_retriever().retrieve_grammar(session, q, top_k=5)
+    except Exception:
+        logger.exception("tutor grammar RAG retrieve failed")
+        return []
+
+
 @router.post("/chat", response_model=ChatOut)
 async def tutor_chat(
     body: ChatIn,
     _user_id: UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
 ):
     system = VOICE_TUTOR_SYSTEM if body.mode == "voice" else TUTOR_SYSTEM
-    # Voice: room for a real answer; cooler temperature for accuracy
     if body.mode == "voice":
-        # Enough room for a real grammar mini-lesson; some variety vs. looping
         max_tokens = min(max(body.max_tokens, 220), 420)
         temperature = 0.55
     else:
         max_tokens = body.max_tokens
         temperature = body.temperature
+
+    latest = _latest_user_text(body.messages)
+    retrieved: list[dict[str, Any]] = []
+    used_rag = False
+    if latest and _is_grammar_query(latest):
+        retrieved = await _retrieve_grammar_for_tutor(db, latest)
+        rag_block = _format_handbook_context(retrieved)
+        if rag_block:
+            system = f"{system}\n\n{rag_block}"
+            used_rag = True
+
     messages = [{"role": "system", "content": system}]
     for m in body.messages[-12:]:
         if m.role == "system":
@@ -183,7 +308,11 @@ async def tutor_chat(
             max_tokens=max_tokens,
             temperature=min(temperature + 0.15, 0.75),
         )
-    return ChatOut(reply=reply)
+    return ChatOut(
+        reply=reply,
+        retrieved_sources=_sources_payload(retrieved) if used_rag else [],
+        used_rag=used_rag,
+    )
 
 
 @router.post("/tts", response_model=TTSOut)

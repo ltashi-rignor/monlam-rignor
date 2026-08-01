@@ -11,6 +11,7 @@ from sqlalchemy import text
 
 from app.api import (
     auth,
+    cms,
     dashboard,
     essay,
     games,
@@ -26,7 +27,7 @@ from app.core.config import get_settings
 from app.core.security import get_current_user_id
 from app.database.session import Base, engine
 from app.models import entities  # noqa: F401 — register models
-from app.services.seed import seed_content_library
+from app.services.seed import seed_cms_content, seed_content_library
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -46,6 +47,7 @@ async def lifespan(_: FastAPI):
         ):
             await conn.execute(text(stmt))
     await seed_content_library()
+    await seed_cms_content()
     if settings.embedding_preload:
         from app.rag.embeddings import get_embeddings
 
@@ -78,6 +80,7 @@ def create_app() -> FastAPI:
     # All domain routers are JWT-protected at the route level via Depends(get_current_user_id).
     # Auth request/verify endpoints remain public.
     app.include_router(auth.router, prefix="/api")
+    app.include_router(cms.router, prefix="/api")
     app.include_router(dashboard.router, prefix="/api")
     app.include_router(planner.router, prefix="/api")
     app.include_router(grammar.router, prefix="/api")
