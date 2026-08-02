@@ -224,8 +224,22 @@ class EssayOut(BaseModel):
 
 
 # ---------- Practice ----------
+class PracticeSeedMistake(BaseModel):
+    """One grammar-check mistake to target in generated drills."""
+
+    mistake_type: str | None = None
+    original: str = ""
+    correction: str = ""
+    explanation: str | None = None
+    related_rule: str | None = None
+    source_ref: str | None = None
+
+
 class PracticeGenerateRequest(BaseModel):
     focus: str | None = None
+    # When set (e.g. from Grammar → Practice), these mistakes drive the drills
+    # instead of (or ahead of) the generic recent-mistake history.
+    seed_mistakes: list[PracticeSeedMistake] | None = None
 
 
 class PracticeSubmitRequest(BaseModel):

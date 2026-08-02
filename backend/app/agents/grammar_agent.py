@@ -164,6 +164,86 @@ def _dedupe_mistakes(items: list[dict[str, Any]], *, max_items: int = 6) -> list
 
 _DEFAULT_CLEAN_PRAISE = "ཡི་གེ་འདི་བརྡ་སྤྲོད་ཐད་ནས་ནོར་འཁྲུལ་མེད། ཡག་པོ་བྲིས་འདུག"
 
+_RULES_SOURCE = {
+    "page_number": None,
+    "title": "V1 simple grammar rules — རྣམ་དབྱེ + ཡིན/རེད/ཡོད/འདུག",
+    "source_name": "simple-grammar-rules",
+    "score": 1.0,
+    "excerpt": (
+        "Deterministic case/copula/role scan; handbook RAG grounds explanations when hits exist"
+    ),
+}
+
+
+def _source_cite(row: dict[str, Any]) -> str:
+    """Short citation for source_ref (source · p.N)."""
+    name = str(row.get("source_name") or row.get("title") or "handbook").strip()
+    page = row.get("page_number")
+    if page is not None and str(page).strip() != "":
+        return _clamp(f"{name} · p.{page}", 120) or name
+    return _clamp(name, 120) or "handbook"
+
+
+def _build_retrieved_sources(
+    retrieved: list[dict[str, Any]],
+    *,
+    include_rules_note: bool = True,
+) -> list[dict[str, Any]]:
+    """API/UI sources: real pgvector hits first, then optional rules-layer note."""
+    sources: list[dict[str, Any]] = []
+    for row in retrieved or []:
+        content = str(row.get("content") or "").strip()
+        if not content:
+            continue
+        page = row.get("page_number")
+        try:
+            page_i = int(page) if page is not None and str(page).strip() != "" else None
+        except (TypeError, ValueError):
+            page_i = None
+        score_raw = row.get("score")
+        try:
+            score = float(score_raw) if score_raw is not None else None
+        except (TypeError, ValueError):
+            score = None
+        sources.append(
+            {
+                "page_number": page_i,
+                "title": str(row.get("title") or row.get("source_name") or "handbook").strip()
+                or None,
+                "source_name": str(row.get("source_name") or "grammar").strip() or "grammar",
+                "score": score,
+                "excerpt": content[:320],
+            }
+        )
+    if include_rules_note:
+        sources.append(dict(_RULES_SOURCE))
+    return sources
+
+
+def _attach_handbook_cites(
+    mistakes: list[dict[str, Any]],
+    retrieved: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Fill missing source_ref from top RAG hit; do not invent new mistake types."""
+    if not mistakes or not retrieved:
+        return mistakes
+    top = next(
+        (r for r in retrieved if str(r.get("content") or "").strip()),
+        None,
+    )
+    if top is None:
+        return mistakes
+    cite = _source_cite(top)
+    out: list[dict[str, Any]] = []
+    for item in mistakes:
+        m = dict(item)
+        existing = _as_str(m.get("source_ref")).strip()
+        # Keep LLM/rule cites that already point somewhere useful.
+        if not existing or existing.startswith("simple-rules"):
+            m["source_ref"] = cite
+        out.append(m)
+    return out
+
 
 def _change_score(original: str, correction: str) -> int:
     """Rough count of how much the correction rewrites the original."""
@@ -291,26 +371,78 @@ def normalize_grammar_result(result: dict[str, Any], fallback_text: str) -> dict
     }
 
 
+_result_cache = None
+
+
+def _get_result_cache():
+    global _result_cache
+    if _result_cache is None:
+        from app.core.config import get_settings
+        from app.services.cache_backend import JsonTTLCache
+
+        settings = get_settings()
+        _result_cache = JsonTTLCache(
+            namespace="grammar-result",
+            maxsize=settings.grammar_result_cache_size,
+            ttl_s=settings.grammar_result_cache_ttl_s,
+        )
+    return _result_cache
+
+
+def _profile_cache_key(profile: dict[str, Any] | None) -> dict[str, Any]:
+    """Only profile fields that affect the grammar prompt."""
+    if not profile:
+        return {}
+    keys = (
+        "level",
+        "current_level",
+        "school_class",
+        "difficulty",
+        "abilities",
+        "learning_styles",
+        "ai_prefs",
+    )
+    return {k: profile.get(k) for k in keys if k in profile}
+
+
 async def run_grammar(
     session: AsyncSession,
     text: str,
     profile: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """V1: Claude primary (when available) + rule scan for gaps."""
+    """V1: rule scan + pgvector handbook RAG + Claude/Melong when available."""
+    import asyncio
+
     from app.agents.simple_grammar_check import (
         apply_simple_corrections,
+        normalize_tibetan_text,
         scan_simple_mistakes,
     )
+    from app.core.config import get_settings
     from app.rag.retriever import get_retriever
     from app.services.claude_llm import claude_configured, get_grammar_llm
+    from app.services.ttl_cache import stable_hash
+
+    settings = get_settings()
+
+    # Normalize once so rule spans, RAG, and corrections share the same text.
+    text = normalize_tibetan_text(text)
+    cache_key = stable_hash(["grammar-result", text, _profile_cache_key(profile)])
+    cached = _get_result_cache().get(cache_key)
+    if cached is not None:
+        logger.info("Grammar result cache hit (len=%s)", len(text or ""))
+        return dict(cached)
 
     rule_mistakes = scan_simple_mistakes(text, max_items=14)
 
     retrieved: list[dict[str, Any]] = []
     try:
         retrieved = await get_retriever().retrieve_grammar(session, text, top_k=4)
-    except Exception:
+    except Exception as exc:
+        logger.warning("Grammar RAG retrieve failed (%s); continuing without handbook", exc)
         retrieved = []
+    if (text or "").strip() and not retrieved:
+        logger.info("Grammar RAG returned 0 usable hits for query (len=%s)", len(text or ""))
 
     llm_mistakes: list[dict[str, Any]] = []
     praise = None
@@ -319,6 +451,8 @@ async def run_grammar(
     llm_corrected = ""
     provider = "rules"
     llm_ok = False
+    llm_timeout = float(settings.grammar_llm_timeout_s or 25.0)
+    llm_max_tokens = int(settings.grammar_llm_max_tokens or 1800)
     try:
         llm = get_grammar_llm()
         used_provider = (
@@ -326,13 +460,16 @@ async def run_grammar(
             if claude_configured() and llm.__class__.__name__.startswith("Claude")
             else "melong"
         )
-        llm_result = await llm.complete_json_async(
-            prompts.grammar_system(),
-            prompts.grammar_user(text, retrieved, profile),
-            max_tokens=3500,
-            temperature=0.1,
-            retries=1,
-            timeout=120.0,
+        llm_result = await asyncio.wait_for(
+            llm.complete_json_async(
+                prompts.grammar_system(),
+                prompts.grammar_user(text, retrieved, profile),
+                max_tokens=llm_max_tokens,
+                temperature=0.1,
+                retries=0,
+                timeout=llm_timeout,
+            ),
+            timeout=llm_timeout + 2.0,
         )
         llm_mistakes = list(llm_result.get("mistakes") or [])
         praise = llm_result.get("praise")
@@ -348,7 +485,7 @@ async def run_grammar(
         )
         provider = used_provider
     except Exception as exc:
-        logger.warning("Grammar LLM failed (%s); using rule scan only", exc)
+        logger.warning("Grammar LLM failed/timeout (%s); using rule scan only", exc)
         provider = "rules"
 
     merged = merge_grammar_mistakes(
@@ -356,6 +493,7 @@ async def run_grammar(
         llm_mistakes,
         llm_primary=llm_ok,
     )
+    merged = _attach_handbook_cites(merged, retrieved)
 
     if llm_corrected and _norm_compare(llm_corrected) != _norm_compare(text):
         # Apply only rule fixes Claude left behind (original still present).
@@ -381,6 +519,15 @@ async def run_grammar(
         if len(related) >= 5:
             break
 
+    sources = _build_retrieved_sources(retrieved, include_rules_note=True)
+    if sources and sources[-1].get("source_name") == "simple-grammar-rules":
+        sources[-1] = {
+            **sources[-1],
+            "title": (
+                f"V1 grammar ({provider}) — རྣམ་དབྱེ + ཡིན/རེད/ཡོད/འདུག"
+            ),
+        }
+
     result = {
         "mistakes": merged,
         "honorific_mistakes": [],
@@ -389,21 +536,12 @@ async def run_grammar(
         "practice_questions": [],
         "summary": summary,
         "praise": praise,
-        "retrieved_sources": [
-            {
-                "page_number": None,
-                "title": f"V1 grammar ({provider}) — རྣམ་དབྱེ + ཡིན/རེད/ཡོད/འདུག",
-                "source_name": "simple-grammar-rules",
-                "score": 1.0,
-                "excerpt": (
-                    "Claude primary when configured; rules fill gaps "
-                    "(case + evidentiality + role)"
-                ),
-            }
-        ],
+        "retrieved_sources": sources,
     }
     if merged and not praise:
         result["praise"] = (
             "འགའ་ཤས་བཅོས་དགོས་པ་འདུག གཤམ་གྱི་ཕྲད་དང་ཡིན་རེད་ཡོད་འདུག་ལ་གཟིགས།"
         )
-    return normalize_grammar_result(result, text)
+    normalized = normalize_grammar_result(result, text)
+    _get_result_cache().set(cache_key, dict(normalized))
+    return normalized

@@ -163,22 +163,41 @@ async def generate_practice(
     rate_limit_llm(request, str(user_id))
     user = await db.get(User, user_id)
     profile = profile_for_agents(user) if user else {}
-    mistakes_result = await db.execute(
-        select(Mistake)
-        .where(Mistake.user_id == user_id)
-        .order_by(Mistake.created_at.desc())
-        .limit(20)
-    )
-    mistakes = [
+
+    # Prefer explicit seed from Grammar → Practice (this check's errors).
+    seed = [
         {
-            "mistake_type": m.mistake_type,
-            "original": m.original,
-            "correction": m.correction,
+            "mistake_type": (m.mistake_type or "").strip() or "grammar",
+            "original": (m.original or "").strip(),
+            "correction": (m.correction or "").strip(),
             "explanation": m.explanation,
             "related_rule": m.related_rule,
+            "source_ref": m.source_ref,
         }
-        for m in mistakes_result.scalars().all()
-    ]
+        for m in (body.seed_mistakes or [])
+        if (m.original or "").strip() or (m.correction or "").strip()
+    ][:12]
+    from_grammar_seed = bool(seed)
+
+    if seed:
+        mistakes = seed
+    else:
+        mistakes_result = await db.execute(
+            select(Mistake)
+            .where(Mistake.user_id == user_id)
+            .order_by(Mistake.created_at.desc())
+            .limit(20)
+        )
+        mistakes = [
+            {
+                "mistake_type": m.mistake_type,
+                "original": m.original,
+                "correction": m.correction,
+                "explanation": m.explanation,
+                "related_rule": m.related_rule,
+            }
+            for m in mistakes_result.scalars().all()
+        ]
     progress = await db.scalar(select(Progress).where(Progress.user_id == user_id))
     progress_data = {
         "grammar_score": progress.grammar_score if progress else 0,
@@ -188,7 +207,13 @@ async def generate_practice(
         "vocabulary_score": progress.vocabulary_score if progress else 0,
         "learning_graph": progress.learning_graph if progress else {},
     }
-    exercises = await run_practice(mistakes, progress_data, body.focus, profile)
+    exercises = await run_practice(
+        mistakes,
+        progress_data,
+        body.focus,
+        profile,
+        from_grammar_seed=from_grammar_seed,
+    )
     record = PracticeHistory(
         user_id=user_id,
         exercises_json=exercises,

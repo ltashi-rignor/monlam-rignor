@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Monlam Rignor — Product & Engineering</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600;700&family=Noto+Sans+Tibetan:wght@400;500;700&family=Syne:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="deck">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-en">Monlam Rignor</span>
+          <span class="brand-bo">རིག་ནོར།</span>
+        </div>
+        <div class="progress-wrap" aria-hidden="true">
+          <div class="progress-bar" id="progressBar"></div>
+        </div>
+        <div class="slide-counter" id="slideCounter">01 / 17</div>
+      </header>
+
+      <main class="stage" id="stage">
+        <!-- Cover -->
+        <section class="slide">
+          <div class="cover-orbit" aria-hidden="true"></div>
+          <p class="kicker reveal">Product &amp; engineering · August 2026</p>
+          <h1 class="reveal">Monlam Rignor</h1>
+          <p class="tibetan-hero reveal">རིག་ནོར།</p>
+          <p class="lead reveal">Tibetan language learning — literacy, lessons, AI tutoring, stories, games, and progress in one platform.</p>
+          <div class="stack-pills reveal">
+            <span class="pill">01 Intro</span>
+            <span class="pill">02 Architecture</span>
+            <span class="pill">03 Stack</span>
+            <span class="pill">04 Features</span>
+            <span class="pill">05 Security</span>
+            <span class="pill">06 Maintainability</span>
+            <span class="pill">07 V2</span>
+          </div>
+        </section>
+
+        <!-- Agenda -->
+        <section class="slide">
+          <p class="kicker reveal">Agenda</p>
+          <h2 class="reveal">Today’s walkthrough</h2>
+          <div class="steps reveal">
+            <div class="step"><strong>Introduction</strong> — vision and learner journey</div>
+            <div class="step"><strong>Architecture</strong> — system diagram and request path</div>
+            <div class="step"><strong>Tech stack</strong> — what we built with</div>
+            <div class="step"><strong>Features</strong> — what each capability does</div>
+            <div class="step"><strong>Security</strong> — how we protect sessions and APIs</div>
+            <div class="step"><strong>Maintainability</strong> — structure and coding standards</div>
+            <div class="step"><strong>V2 focus</strong> — where we invest next</div>
+          </div>
+        </section>
+
+        <!-- Intro 1 -->
+        <section class="slide">
+          <p class="kicker reveal">01 · Introduction</p>
+          <h2 class="reveal">Vision</h2>
+          <p class="lead reveal">Help learners build Tibetan from the ground up — letters, vocabulary, conversation, and storytelling.</p>
+          <p class="sub reveal">Melong-powered tools remember the learner across sessions through shared profile, mistakes, skill graph, and plans.</p>
+          <div class="flow reveal">
+            <span class="flow-node hot">Discover</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-node">Join</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-node">Learn</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-node">Practice</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-node hot">Speak</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-node">Grow</span>
+          </div>
+        </section>
+
+        <!-- Intro 2 journey -->
+        <section class="slide">
+          <p class="kicker reveal">01 · Introduction</p>
+          <h2 class="reveal">Learner journey</h2>
+          <div class="table-wrap reveal">
+            <table>
+              <thead><tr><th>Stage</th><th>Experience</th></tr></thead>
+              <tbody>
+                <tr><td>Discover</td><td>Public marketing site (CMS)</td></tr>
+                <tr><td>Join</td><td>Email OTP signup → onboarding profile</td></tr>
+                <tr><td>Learn</td><td>Path, lessons, alphabet, flashcards, handwriting</td></tr>
+                <tr><td>Practice</td><td>Daily drills, Letter Party, grammar check &amp; quest</td></tr>
+                <tr><td>Speak &amp; chat</td><td>Melong Tutor (text + voice), Story + speak</td></tr>
+                <tr><td>Grow</td><td>Progress graph, recommendations, dashboard</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Architecture -->
+        <section class="slide">
+          <p class="kicker reveal">02 · Architecture</p>
+          <h2 class="reveal">System diagram</h2>
+          <div class="arch reveal">
+            <div class="arch-row">
+              <div class="arch-box gold"><strong>React SPA</strong><small>CMS + Learner app · Tibetan i18n · cookies</small></div>
+            </div>
+            <div class="arch-row"><span class="flow-arrow">▼</span></div>
+            <div class="arch-row">
+              <div class="arch-box"><strong>Edge</strong><small>Vite proxy · nginx + CSP (prod)</small></div>
+            </div>
+            <div class="arch-row"><span class="flow-arrow">▼</span></div>
+            <div class="arch-row">
+              <div class="arch-box gold"><strong>FastAPI</strong><small>Auth · rate limits · feature routers</small></div>
+            </div>
+            <div class="arch-row"><span class="flow-arrow">▼</span></div>
+            <div class="arch-row">
+              <div class="arch-box jade"><strong>Agents</strong><small>Melong tools</small></div>
+              <div class="arch-box jade"><strong>RAG</strong><small>pgvector · BGE-M3</small></div>
+              <div class="arch-box"><strong>PostgreSQL</strong><small>shared memory</small></div>
+              <div class="arch-box"><strong>Redis</strong><small>cache · limits</small></div>
+            </div>
+            <div class="arch-row"><span class="flow-arrow">▼</span></div>
+            <div class="arch-row">
+              <div class="arch-box gold"><strong>Melong Studio</strong><small>chat · TTS · STT · OCR</small></div>
+              <div class="arch-box"><strong>Claude</strong><small>grammar option</small></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Architecture path -->
+        <section class="slide">
+          <p class="kicker reveal">02 · Architecture</p>
+          <h2 class="reveal">Request path</h2>
+          <div class="flow reveal" style="justify-content:flex-start">
+            <span class="flow-node hot">User action</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-node">Router</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-node">Agent / service</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-node">Melong · RAG · bank</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-node hot">Shared DB</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-node">UI</span>
+          </div>
+          <div class="grid-2 reveal" style="margin-top:1.2rem">
+            <div class="card jade">
+              <h3>Shared memory</h3>
+              <p><span class="mono">learner_profile</span> · mistakes · learning graph · plans</p>
+            </div>
+            <div class="card accent">
+              <h3>Deploy</h3>
+              <p>Local Compose (db, redis, mailpit) · Prod Compose (nginx, Redis, pgvector)</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Tech stack -->
+        <section class="slide">
+          <p class="kicker reveal">03 · Tech stack</p>
+          <h2 class="reveal">What we build with</h2>
+          <div class="table-wrap reveal">
+            <table>
+              <thead><tr><th>Layer</th><th>Technology</th><th>Role</th></tr></thead>
+              <tbody>
+                <tr><td>Frontend</td><td>React 19 · Vite · Zustand</td><td>SPA &amp; client state</td></tr>
+                <tr><td>API</td><td>FastAPI · Pydantic · Alembic</td><td>REST + migrations</td></tr>
+                <tr><td>AI</td><td>Melong · Claude (grammar) · prompts</td><td>Agents &amp; generation</td></tr>
+                <tr><td>Voice / OCR</td><td>Melong TTS · STT · OCR</td><td>Tutor, speak, homework</td></tr>
+                <tr><td>RAG</td><td>BGE-M3 · pgvector · HNSW</td><td>Handbook grounding</td></tr>
+                <tr><td>Data / cache</td><td>PostgreSQL · Redis · YAML banks</td><td>Memory, speed, fallbacks</td></tr>
+                <tr><td>Ops</td><td>Docker · nginx · Mailpit · oxlint · pytest</td><td>Deploy &amp; quality</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Features overview -->
+        <section class="slide">
+          <p class="kicker reveal">04 · Features</p>
+          <h2 class="reveal">Platform capabilities</h2>
+          <div class="pillars reveal">
+            <div class="pillar" data-n="01"><strong>CMS &amp; Auth</strong><span>Marketing site · OTP · onboarding profile</span></div>
+            <div class="pillar" data-n="02"><strong>Learn</strong><span>Dashboard · path · lessons · alphabet · flash · handwriting</span></div>
+            <div class="pillar" data-n="03"><strong>Practice</strong><span>Daily drills · Letter Party · grammar</span></div>
+            <div class="pillar" data-n="04"><strong>AI</strong><span>Tutor voice · Story · speak · recommendations</span></div>
+          </div>
+        </section>
+
+        <!-- Features learn -->
+        <section class="slide">
+          <p class="kicker reveal">04 · Features · Learn</p>
+          <h2 class="reveal">Path, lessons &amp; literacy</h2>
+          <div class="grid-2 reveal">
+            <div class="card accent">
+              <h3>Dashboard &amp; path</h3>
+              <p>Skill overview from the database. Melong builds a week-by-week roadmap from the learner profile, with YAML available as fallback.</p>
+            </div>
+            <div class="card jade">
+              <h3>Interactive lessons</h3>
+              <p>Staged flow: words → dialogue → quiz. Bank content for instant UX, Melong enrich on demand.</p>
+            </div>
+            <div class="card">
+              <h3>Alphabet &amp; flashcards</h3>
+              <p>Mastery journeys with Melong TTS — see, hear, match, unlock the next row or theme.</p>
+            </div>
+            <div class="card">
+              <h3>Handwriting</h3>
+              <p>Canvas stroke tracing with tip lessons. Builds letter motor memory without an LLM call.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Features practice + AI -->
+        <section class="slide">
+          <p class="kicker reveal">04 · Features · Practice &amp; AI</p>
+          <h2 class="reveal">Drills, games, tutor, story</h2>
+          <div class="grid-2 reveal">
+            <div class="card jade">
+              <h3>Daily Practice</h3>
+              <p>Melong drills from mistakes and profile. Sanitizer keeps items scorable. Can continue from grammar errors.</p>
+            </div>
+            <div class="card accent">
+              <h3>Letter Party</h3>
+              <p>Falling-word vocabulary game. Melong theme packs with YAML fallback.</p>
+            </div>
+            <div class="card accent">
+              <h3>Grammar</h3>
+              <p>Hybrid check: rules, RAG handbook, Melong/Claude. OCR homework. Grammar Quest play mode.</p>
+            </div>
+            <div class="card jade">
+              <h3>Tutor &amp; Story</h3>
+              <p>Profile-aware chat + live voice. Kid stories with glossary, quiz, and speak practice.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Features progress -->
+        <section class="slide">
+          <p class="kicker reveal">04 · Features · Grow</p>
+          <h2 class="reveal">Progress &amp; public CMS</h2>
+          <div class="grid-2 reveal">
+            <div class="card">
+              <h3>Progress</h3>
+              <ul class="clean">
+                <li>Skill bars synced from learner activity</li>
+                <li>Melong refresh updates the learning graph</li>
+                <li>Recommendations for next content</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h3>Public CMS</h3>
+              <ul class="clean">
+                <li>Home, About, Features, Programs, AI</li>
+                <li>Blog, News, FAQ, Contact</li>
+                <li>Same SPA — marketing into the learner app</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <!-- Security -->
+        <section class="slide">
+          <p class="kicker reveal">05 · Security</p>
+          <h2 class="reveal">Security implementation</h2>
+          <div class="table-wrap reveal">
+            <table>
+              <thead><tr><th>Area</th><th>Implementation</th></tr></thead>
+              <tbody>
+                <tr><td>Session</td><td>httpOnly cookies · refresh rotation · logout revoke</td></tr>
+                <tr><td>Credentials</td><td>Hashed passwords · hashed OTP · prior OTPs invalidated</td></tr>
+                <tr><td>Browser</td><td>credentials include · prod nginx CSP &amp; headers</td></tr>
+                <tr><td>Proxy</td><td>TRUST_PROXY_HEADERS only behind trusted nginx</td></tr>
+                <tr><td>Rate limits</td><td>Redis sliding window · stricter voice tier</td></tr>
+                <tr><td>Secrets &amp; API</td><td>Strong JWT in prod · docs off · CORS allowlist</td></tr>
+                <tr><td>LLM</td><td>Token / message / input length caps</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Maintainability -->
+        <section class="slide">
+          <p class="kicker reveal">06 · Maintainability</p>
+          <h2 class="reveal">Code structure</h2>
+          <div class="table-wrap reveal">
+            <table>
+              <thead><tr><th>Pattern</th><th>Practice</th></tr></thead>
+              <tbody>
+                <tr><td>Layered backend</td><td><span class="mono">api/</span> → <span class="mono">agents/</span> · <span class="mono">services/</span> → models / DB</td></tr>
+                <tr><td>One feature, one agent</td><td>Clear entrypoints: <span class="mono">run_planner</span>, <span class="mono">run_practice</span>, …</td></tr>
+                <tr><td>Shared contracts</td><td><span class="mono">prompt_manager.py</span> · shared <span class="mono">llm.py</span></td></tr>
+                <tr><td>Config &amp; schema</td><td>Pydantic Settings · Alembic migrations</td></tr>
+                <tr><td>Frontend</td><td>Feature <span class="mono">pages/</span> · shared <span class="mono">components/</span> · one API client</td></tr>
+                <tr><td>i18n &amp; banks</td><td>Paired <span class="mono">bo</span>/<span class="mono">en</span> · YAML under <span class="mono">content/</span></td></tr>
+                <tr><td>Quality</td><td>pytest · oxlint · i18n key scan scripts</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Coding standards -->
+        <section class="slide">
+          <p class="kicker reveal">06 · Maintainability</p>
+          <h2 class="reveal">Coding standards we keep</h2>
+          <ul class="clean reveal">
+            <li>Small, typed Python modules with clear async boundaries</li>
+            <li>Validate and sanitize Melong JSON before UI scoring</li>
+            <li>Tibetan-first strings in i18n — keep learner copy out of hard-coded English</li>
+            <li>Document fallbacks and behavior in README / architecture notes</li>
+            <li>Add features by extending router + agent + page — without rewriting the core</li>
+          </ul>
+          <p class="quote reveal">Predictable folders make the codebase ready for new contributors and V2 work.</p>
+        </section>
+
+        <!-- V2 -->
+        <section class="slide">
+          <p class="kicker reveal">07 · V2 focus</p>
+          <h2 class="reveal">Where we invest next</h2>
+          <div class="table-wrap reveal">
+            <table>
+              <thead><tr><th>#</th><th>Focus</th><th>Why</th></tr></thead>
+              <tbody>
+                <tr><td>1</td><td>Teacher / classroom dashboard</td><td>Multi-learner visibility &amp; assignments</td></tr>
+                <tr><td>2</td><td>Richer content library &amp; recommendations</td><td>Curated catalog for next-best learning</td></tr>
+                <tr><td>3</td><td>True pronunciation scoring</td><td>Beyond character-overlap effort</td></tr>
+                <tr><td>4</td><td>Broader RAG corpora</td><td>Dictionaries, textbooks, exams</td></tr>
+                <tr><td>5</td><td>Essay / writing UI</td><td>Ship the existing scoring pipeline to learners</td></tr>
+                <tr><td>6</td><td>Accessibility &amp; ai_prefs in UI</td><td>Honor onboarding preferences end-to-end</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- V2 ongoing -->
+        <section class="slide">
+          <p class="kicker reveal">07 · V2 focus</p>
+          <h2 class="reveal">Keep strengthening</h2>
+          <div class="grid-2 reveal">
+            <div class="card jade">
+              <h3>Reliability</h3>
+              <p>Fail-open banks, Melong timeouts, Redis under multi-worker load</p>
+            </div>
+            <div class="card accent">
+              <h3>Language quality</h3>
+              <p>Grammar grounding, OCR corpus, botok packs, Tibetan UX polish</p>
+            </div>
+            <div class="card accent">
+              <h3>Insights</h3>
+              <p>Stronger practice &amp; path analytics for learners and teachers</p>
+            </div>
+            <div class="card jade">
+              <h3>Offline clarity</h3>
+              <p>Expand status banners when serving fallback content</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Close -->
+        <section class="slide">
+          <div class="cover-orbit" aria-hidden="true"></div>
+          <p class="kicker reveal">Thank you</p>
+          <h2 class="reveal">Monlam Rignor</h2>
+          <p class="tibetan-hero reveal">རིག་ནོར།</p>
+          <p class="lead reveal">Architecture · stack · features · security · maintainable code · clear V2 path.</p>
+          <div class="stack-pills reveal">
+            <span class="pill">React + FastAPI</span>
+            <span class="pill">pgvector</span>
+            <span class="pill">Redis</span>
+            <span class="pill">Melong</span>
+            <span class="pill">Shared learner memory</span>
+          </div>
+        </section>
+      </main>
+
+      <footer class="footer-bar">
+        <div class="nav-hint">
+          <kbd>←</kbd> <kbd>→</kbd> · <kbd>F</kbd> fullscreen · <kbd>Space</kbd> next
+        </div>
+        <div class="nav-buttons">
+          <button type="button" id="prevBtn">Previous</button>
+          <button type="button" id="nextBtn">Next</button>
+        </div>
+      </footer>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>

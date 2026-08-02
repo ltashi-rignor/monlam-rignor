@@ -6,6 +6,7 @@ Agentic learning app: **React + Vite** frontend, **FastAPI** backend, **PostgreS
 
 - Python **3.12** + project `.venv`
 - PostgreSQL with **pgvector**
+- Optional **Redis** (shared grammar/RAG caches + rate limits; memory fallback if unset)
 - Node.js 20+
 - `MONLAM_API_KEY` in `.env` (Monlam Studio X-API-Key)
 
@@ -94,10 +95,26 @@ Prod compose sets `TRUST_PROXY_HEADERS=true` so rate limits can use `X-Forwarded
 - Reorder (when valid) includes `tokens[]` chunks; UI shows them as chips
 - Last question uses **Finish** (`མཇུག་སྒྲིལ།`); MC answers auto-advance
 
+### Learner profile vs static study banks
+
+Onboarding saves `learner_profile` (goals, ability, interests, schedule, …). Melong agents use it for **path, interactive lessons, practice, tutor, story, recommendations**.
+
+| Surface | Personalized from profile? |
+|---------|----------------------------|
+| Learning path / path lessons | Yes (Melong + theme bank) |
+| Daily practice | Yes (mistakes + profile) |
+| Tutor / Story / Recommendations | Yes |
+| **Flashcards / Alphabet / Handwriting** | **No** — fixed data in `frontend/src/data/`; only mastery unlocks the next theme/row |
+| Letter Party | User picks theme → Melong/YAML pack (not auto from profile) |
+
+See `tashi.md` §6.3 for the full matrix.
+
 ### Grammar & RAG
 
 - Grammar check can use Melong or Claude (`GRAMMAR_LLM_PROVIDER`)
 - Handbook excerpts are retrieved (pgvector) and passed into prompts
+- Optional **botok** tokenizer improves case-particle spans and RAG particle queries when a dialect pack is present (`GRAMMAR_USE_BOTOK`, see `data/botok/README.md`); regex rules remain the fallback
+- Grammar check caches results + RAG hits (`GRAMMAR_*_CACHE_*`; Redis when `REDIS_URL` is set, else in-process) and caps LLM wait (`GRAMMAR_LLM_TIMEOUT_S`) so slow Claude/Melong falls back to rules+RAG
 - Grammar Quest falls back to RAG/bank when Melong is rate-limited
 
 ### CMS marketing stats
@@ -118,6 +135,8 @@ See `.env.example` for the full list. Common ones:
 | `CORS_ORIGINS` | Comma-separated; no `*` in production |
 | `OTP_DEV_LOG` | Log OTP codes — **never** in production |
 | `GRAMMAR_LLM_PROVIDER` | `auto` \| `claude` \| `melong` |
+| `GRAMMAR_USE_BOTOK` | Optional Tibetan tokenizer (fail-open if pack missing) |
+| `REDIS_URL` | Optional; e.g. `redis://localhost:6379/0` — caches + rate limits |
 
 ## API surface (prefix `/api`)
 

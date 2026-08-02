@@ -30,13 +30,24 @@ Production Docker image uses `Dockerfile.prod` + `nginx.conf` (CSP and security 
 | `src/store/` | Zustand auth + module progress |
 | `src/i18n/` | `bo.js` / `en.js` |
 | `src/lib/` | Trace engine, game helpers, lazy `loadTraceData` |
-| `src/data/` | Static curriculum / speak timing helpers |
+| `src/data/` | Static curriculum: flash themes (`flashJourney.js`), alphabet journey, `tibetan.js` vocab, speak timing |
 
 ## Auth (browser)
 
 - Login/register responses set `mr_access` / `mr_refresh` httpOnly cookies
 - Client keeps a session hint in `sessionStorage` only; legacy `localStorage` tokens are scrubbed
 - 401 on protected APIs → cookie refresh → retry, else redirect to login
+
+## Personalization (what profile does / doesn’t drive)
+
+Learner profile from onboarding feeds Melong for path, lessons, practice, tutor, story, recommendations.
+
+**Not profile-generated:**
+
+- **Flashcards** — fixed themes/words; mastering unlocks the next theme (`Flashcards.jsx` + `flashJourney.js` + `tibetan.js`)
+- **Alphabet / Handwriting** — fixed rows/strokes; mastery unlock only
+
+**Partially user-driven:** Letter Party / Vocab Rain use a **theme the user picks**, then Melong or a YAML pack.
 
 ## Practice UX
 

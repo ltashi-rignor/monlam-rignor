@@ -37,6 +37,31 @@ function normalizeAnswer(value) {
   return String(value)
 }
 
+const PRACTICE_SEED_KEY = 'mr_practice_seed_mistakes'
+
+function takePracticeSeedMistakes() {
+  try {
+    const raw = sessionStorage.getItem(PRACTICE_SEED_KEY)
+    if (!raw) return null
+    sessionStorage.removeItem(PRACTICE_SEED_KEY)
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed) || !parsed.length) return null
+    return parsed
+      .filter((m) => m && (m.original || m.correction))
+      .slice(0, 12)
+      .map((m) => ({
+        mistake_type: m.mistake_type || 'grammar',
+        original: m.original || '',
+        correction: m.correction || '',
+        explanation: m.explanation || null,
+        related_rule: m.related_rule || null,
+        source_ref: m.source_ref || null,
+      }))
+  } catch {
+    return null
+  }
+}
+
 function typeLabel(type, t) {
   const map = {
     fill_blank: t.practice.typeFill,
@@ -118,6 +143,7 @@ export default function Practice() {
     const focusParam = params.get('focus') || ''
     const shouldAuto = params.get('auto') === '1'
     const fromGrammar = params.get('from') === 'grammar'
+    const wantSeed = params.get('seed') === '1' || fromGrammar
 
     if (focusParam) setFocus(focusParam)
 
@@ -125,11 +151,14 @@ export default function Practice() {
       try {
         const latest = await api.getLatestPractice()
         if (cancelled) return
-        setSession(latest)
-        const list = latest?.exercises_json?.exercises
-        if (Array.isArray(list) && list.length) setStep(0)
-        if (latest?.exercises_json?.submitted_answers) {
-          setAnswers(latest.exercises_json.submitted_answers)
+        // Skip restoring an old set when deep-linking from Grammar — generate fresh.
+        if (!(fromGrammar || shouldAuto)) {
+          setSession(latest)
+          const list = latest?.exercises_json?.exercises
+          if (Array.isArray(list) && list.length) setStep(0)
+          if (latest?.exercises_json?.submitted_answers) {
+            setAnswers(latest.exercises_json.submitted_answers)
+          }
         }
       } catch {
         /* empty */
@@ -148,12 +177,14 @@ export default function Practice() {
       }
       if (!shouldAuto) return
 
+      const seedMistakes = wantSeed ? takePracticeSeedMistakes() : null
+
       setBusy(true)
       setBusyKind('generate')
       setError('')
       setReward(null)
       try {
-        const data = await api.generatePractice(focusParam || null)
+        const data = await api.generatePractice(focusParam || null, seedMistakes)
         if (cancelled) return
         setSession(data)
         setAnswers({})
@@ -186,7 +217,8 @@ export default function Practice() {
     setMessage('')
     setReward(null)
     try {
-      const data = await api.generatePractice(focus || null)
+      // Manual regenerate uses adaptive/history focus, not a one-shot grammar seed.
+      const data = await api.generatePractice(focus || null, null)
       setSession(data)
       setAnswers({})
       setStep(0)

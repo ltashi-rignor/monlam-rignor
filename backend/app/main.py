@@ -180,6 +180,7 @@ def create_app() -> FastAPI:
             }
 
         from app.services.llm import melong_is_rate_limited
+        from app.services.redis_client import redis_ping
 
         key = (settings.monlam_api_key or "").strip()
         if not key or key.startswith("YOUR_"):
@@ -188,6 +189,8 @@ def create_app() -> FastAPI:
             checks["melong"] = "rate_limited"
         else:
             checks["melong"] = "configured"
+
+        checks["redis"] = redis_ping()
 
         return {
             "status": "ready",

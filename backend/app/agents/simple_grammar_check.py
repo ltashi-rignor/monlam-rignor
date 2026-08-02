@@ -10,6 +10,16 @@ _BOUND = r"(?=་|[\s།༔\"'”\u0f0d]|$)"
 _SYL = r"[\u0f40-\u0f6c\u0f71-\u0f87\u0f90-\u0fbc]*"
 
 
+def normalize_tibetan_text(text: str) -> str:
+    """Light cleanup before scans (always on; no botok required)."""
+    raw = text or ""
+    # Collapse repeated tshegs and NBSP-ish spaces between Tibetan letters.
+    cleaned = re.sub(r"་{2,}", "་", raw)
+    cleaned = cleaned.replace("\u00a0", " ").replace("\u200b", "")
+    cleaned = re.sub(r"([\u0f00-\u0fff])[ \t]+([\u0f00-\u0fff])", r"\1\2", cleaned)
+    return cleaned.strip()
+
+
 def _mistake(
     *,
     mistake_type: str,
@@ -198,6 +208,159 @@ def scan_case_particles(text: str) -> list[dict[str, Any]]:
     return out
 
 
+
+def _stem_ending_class(stem: str) -> str:
+    """Map stem's final letter to rjes-'jug class used by V1 case rules."""
+    s = (stem or "").rstrip("་").strip()
+    if not s:
+        return ""
+    ch = s[-1]
+    if ch in "གང":
+        return "ga"
+    if ch in "དབས":
+        return "dbs"
+    if ch in "ནམརལ":
+        return "nmral"
+    if ch in "སའ":
+        return "ru"
+    return ""
+
+
+def s_endswith(stem: str, chars: str) -> bool:
+    s = (stem or "").rstrip("་").strip()
+    return bool(s) and s[-1] in chars
+
+
+def scan_case_particles_botok(text: str) -> list[dict[str, Any]]:
+    """
+    Case-particle mistakes from botok stem+affix pairs.
+    Fail-open: returns [] when botok is disabled or unavailable.
+    Ablative (nas/las + motion) stays on the regex scanner.
+    """
+    try:
+        from app.services.botok_tokenize import botok_available, stem_particle_pairs
+    except Exception:
+        return []
+    if not botok_available():
+        return []
+
+    out: list[dict[str, Any]] = []
+    for stem, particle, span in stem_particle_pairs(text):
+        if not stem or not particle:
+            continue
+        klass = _stem_ending_class(stem)
+        if particle == "གིས" and klass == "nmral":
+            out.append(
+                _mistake(
+                    mistake_type="རྣམ་དབྱེ།",
+                    original=span,
+                    correction=f"{stem}་གྱིས",
+                    explanation="རྗེས་འཇུག ན་མ་ར་ལ་ ཡིན་པས་བྱེད་སྒྲ་ལ་ གྱིས དགོས། ག་ང་ ལ་ གིས དགོས།",
+                    related_rule="ན་མ་ར་ལ་ → གྱིས། ག་ང་ → གིས།",
+                    source_ref="botok+rules · རྣམ་དབྱེ་གསུམ་པ",
+                )
+            )
+            continue
+        if particle in {"གྱིས", "ཀྱིས"} and klass == "ga":
+            out.append(
+                _mistake(
+                    mistake_type="རྣམ་དབྱེ།",
+                    original=span,
+                    correction=f"{stem}་གིས",
+                    explanation="རྗེས་འཇུག ག་ང་ ཡིན་པས་བྱེད་སྒྲ་ལ་ གིས དགོས།",
+                    related_rule="ག་ང་ → གིས།",
+                    source_ref="botok+rules · རྣམ་དབྱེ་གསུམ་པ",
+                )
+            )
+            continue
+        if particle in {"གྱིས", "གིས"} and klass == "dbs":
+            out.append(
+                _mistake(
+                    mistake_type="རྣམ་དབྱེ།",
+                    original=span,
+                    correction=f"{stem}་ཀྱིས",
+                    explanation="རྗེས་འཇུག ད་བ་ས་ ཡིན་པས་བྱེད་སྒྲ་ལ་ ཀྱིས དགོས།",
+                    related_rule="ད་བ་ས་ → ཀྱིས།",
+                    source_ref="botok+rules · རྣམ་དབྱེ་གསུམ་པ",
+                )
+            )
+            continue
+        if particle == "གི" and klass == "nmral":
+            out.append(
+                _mistake(
+                    mistake_type="རྣམ་དབྱེ།",
+                    original=span,
+                    correction=f"{stem}་གྱི",
+                    explanation="རྗེས་འཇུག ན་མ་ར་ལ་ ཡིན་པས་འབྲེལ་སྒྲ་ལ་ གྱི དགོས། ག་ང་ ལ་ གི དགོས།",
+                    related_rule="ན་མ་ར་ལ་ → གྱི། ག་ང་ → གི།",
+                    source_ref="botok+rules · རྣམ་དབྱེ་དྲུག་པ",
+                )
+            )
+            continue
+        if particle in {"གྱི", "ཀྱི"} and klass == "ga":
+            out.append(
+                _mistake(
+                    mistake_type="རྣམ་དབྱེ།",
+                    original=span,
+                    correction=f"{stem}་གི",
+                    explanation="རྗེས་འཇུག ག་ང་ ཡིན་པས་འབྲེལ་སྒྲ་ལ་ གི དགོས།",
+                    related_rule="ག་ང་ → གི།",
+                    source_ref="botok+rules · རྣམ་དབྱེ་དྲུག་པ",
+                )
+            )
+            continue
+        if particle in {"གྱི", "གི"} and klass == "dbs":
+            out.append(
+                _mistake(
+                    mistake_type="རྣམ་དབྱེ།",
+                    original=span,
+                    correction=f"{stem}་ཀྱི",
+                    explanation="རྗེས་འཇུག ད་བ་ས་ ཡིན་པས་འབྲེལ་སྒྲ་ལ་ ཀྱི དགོས།",
+                    related_rule="ད་བ་ས་ → ཀྱི།",
+                    source_ref="botok+rules · རྣམ་དབྱེ་དྲུག་པ",
+                )
+            )
+            continue
+        if particle in {"སུ", "ཏུ"} and s_endswith(stem, "ངནམརལ"):
+            out.append(
+                _mistake(
+                    mistake_type="རྣམ་དབྱེ།",
+                    original=span,
+                    correction=f"{stem}་དུ",
+                    explanation="རྗེས་འཇུག ང་ན་མ་ར་ལ་ ཡིན་པས་ལ་དོན་ལ་ དུ དགོས།",
+                    related_rule="ང་ན་མ་ར་ལ་ → དུ། ག་བ་/ད་ → ཏུ།",
+                    source_ref="botok+rules · རྣམ་དབྱེ་གཉིས་པ/བཞི་པ/བདུན་པ",
+                )
+            )
+            continue
+        if particle in {"དུ", "སུ"} and s_endswith(stem, "གབད"):
+            out.append(
+                _mistake(
+                    mistake_type="རྣམ་དབྱེ།",
+                    original=span,
+                    correction=f"{stem}་ཏུ",
+                    explanation="རྗེས་འཇུག ག་བ་ (ཡང་ན་ཡང་འཇུག་ད) ཡིན་པས་ལ་དོན་ལ་ ཏུ དགོས།",
+                    related_rule="ག་བ་/ད་ → ཏུ།",
+                    source_ref="botok+rules · རྣམ་དབྱེ་གཉིས་པ/བཞི་པ/བདུན་པ",
+                )
+            )
+            continue
+        if particle in {"དུ", "སུ", "ཏུ"} and s_endswith(stem, "སའ"):
+            out.append(
+                _mistake(
+                    mistake_type="རྣམ་དབྱེ།",
+                    original=span,
+                    correction=f"{stem}་རུ",
+                    explanation="རྗེས་འཇུག ས་/འ ཡིན་པས་ལ་དོན་ལ་ རུ དགོས།",
+                    related_rule="ས་/འ → རུ།",
+                    source_ref="botok+rules · རྣམ་དབྱེ་གཉིས་པ/བཞི་པ/བདུན་པ",
+                )
+            )
+            continue
+
+    return out
+
+
 def scan_copula_existential(text: str) -> list[dict[str, Any]]:
     """Flag clear ཡིན/རེད/ཡོད/འདུག person/evidentiality mistakes."""
     out: list[dict[str, Any]] = []
@@ -380,12 +543,14 @@ def scan_role_case(text: str) -> list[dict[str, Any]]:
 
 
 def scan_simple_mistakes(text: str, *, max_items: int = 14) -> list[dict[str, Any]]:
-    raw = (text or "").strip()
+    raw = normalize_tibetan_text(text)
     if not raw:
         return []
+    # botok case spans first (when available); regex always runs as coverage/fallback.
     items = (
         scan_copula_existential(raw)
         + scan_role_case(raw)
+        + scan_case_particles_botok(raw)
         + scan_case_particles(raw)
     )
     out: list[dict[str, Any]] = []

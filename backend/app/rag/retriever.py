@@ -56,16 +56,34 @@ def _is_usable_grammar_chunk(row: dict[str, Any]) -> bool:
     return False
 
 
-def _grammar_queries(student_text: str) -> list[str]:
+def _grammar_queries(
+    student_text: str,
+    *,
+    max_particle_queries: int = 1,
+) -> list[str]:
     text = (student_text or "").strip()
     queries: list[str] = []
     if text:
-        queries.append(text[:1600])
+        # Prefer a shorter embed query — full essays blow latency on BGE-M3.
+        queries.append(text[:800])
     queries.append("བོད་ཡིག་བརྡ་སྤྲོད། རྣམ་དབྱེ། ཕྲད། ཞེ་ས། འབྲེལ་སྒྲ།")
-    for particle in _PARTICLE_PROBES:
-        if particle in text:
-            queries.append(f"{particle} རྣམ་དབྱེ། ཕྲད། བཀོལ་སྤྱོད།")
-            break
+
+    # Prefer botok-extracted particles when available; else first probe substring hit.
+    particles: list[str] = []
+    try:
+        from app.services.botok_tokenize import extract_particles
+
+        particles = extract_particles(text, max_items=max(1, max_particle_queries))
+    except Exception:
+        particles = []
+    if not particles:
+        for particle in _PARTICLE_PROBES:
+            if particle in text:
+                particles = [particle]
+                break
+    for particle in particles[: max(0, max_particle_queries)]:
+        queries.append(f"{particle} རྣམ་དབྱེ། ཕྲད། བཀོལ་སྤྱོད།")
+
     # de-dupe preserving order
     seen: set[str] = set()
     out: list[str] = []
@@ -76,6 +94,24 @@ def _grammar_queries(student_text: str) -> list[str]:
         seen.add(key)
         out.append(key)
     return out
+
+
+_rag_cache = None
+
+
+def _get_rag_cache():
+    global _rag_cache
+    if _rag_cache is None:
+        from app.core.config import get_settings
+        from app.services.cache_backend import JsonTTLCache
+
+        settings = get_settings()
+        _rag_cache = JsonTTLCache(
+            namespace="grammar-rag",
+            maxsize=settings.grammar_rag_cache_size,
+            ttl_s=settings.grammar_rag_cache_ttl_s,
+        )
+    return _rag_cache
 
 
 class Retriever:
@@ -91,8 +127,24 @@ class Retriever:
         Retrieve grammar ground-truth chunks for Melong.
         Uses multi-query fusion and drops unusable (non-Tibetan) extracts.
         """
+        from app.core.config import get_settings
+        from app.services.ttl_cache import stable_hash
+
+        settings = get_settings()
+        cache_key = stable_hash(
+            ["grammar-rag", (query or "")[:2000], top_k, multi_query]
+        )
+        cached = _get_rag_cache().get(cache_key)
+        if cached is not None:
+            return [dict(row) for row in cached]
+
         store = get_vector_store()
-        queries = _grammar_queries(query) if multi_query else [query]
+        max_pq = int(settings.grammar_rag_max_particle_queries)
+        queries = (
+            _grammar_queries(query, max_particle_queries=max_pq)
+            if multi_query
+            else [query]
+        )
         merged: dict[Any, dict[str, Any]] = {}
         fetch_k = max(top_k * 2, 10)
 
@@ -107,7 +159,11 @@ class Retriever:
             for hit in hits:
                 if not _is_usable_grammar_chunk(hit):
                     continue
-                key = hit.get("id") or (hit.get("source_name"), hit.get("page_number"), hit.get("content", "")[:80])
+                key = hit.get("id") or (
+                    hit.get("source_name"),
+                    hit.get("page_number"),
+                    hit.get("content", "")[:80],
+                )
                 prev = merged.get(key)
                 score = float(hit.get("score") or 0.0)
                 if prev is None or score > float(prev.get("score") or 0.0):
@@ -118,7 +174,9 @@ class Retriever:
             key=lambda r: float(r.get("score") or 0.0),
             reverse=True,
         )
-        return ranked[:top_k]
+        out = ranked[:top_k]
+        _get_rag_cache().set(cache_key, [dict(row) for row in out])
+        return out
 
     async def retrieve(
         self,

@@ -284,8 +284,14 @@ export const api = {
   generateStory: (body) => request('/api/story/generate', { method: 'POST', body }),
   storyHistory: () => request('/api/story/history', { ttl: 15_000 }),
   defineStoryWord: (word) => request('/api/story/define', { method: 'POST', body: { word } }),
-  generatePractice: (focus) =>
-    request('/api/practice/generate', { method: 'POST', body: { focus: focus || null } }),
+  generatePractice: (focus, seedMistakes = null) =>
+    request('/api/practice/generate', {
+      method: 'POST',
+      body: {
+        focus: focus || null,
+        seed_mistakes: Array.isArray(seedMistakes) && seedMistakes.length ? seedMistakes : null,
+      },
+    }),
   submitPractice: (body) => request('/api/practice/submit', { method: 'POST', body }),
   practiceHistory: () => request('/api/practice/history', { ttl: 15_000 }),
   getProgress: () => request('/api/progress', { ttl: 20_000 }),

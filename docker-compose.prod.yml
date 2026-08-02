@@ -21,6 +21,21 @@ services:
     networks:
       - internal
 
+  redis:
+    image: redis:7-alpine
+    container_name: monlam-rignor-redis
+    volumes:
+      - redisdata:/data
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - internal
+
   backend:
     build:
       context: ./backend
@@ -32,6 +47,7 @@ services:
       APP_ENV: production
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-monlam}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-monlam_rignor}
       DATABASE_URL_SYNC: postgresql://${POSTGRES_USER:-monlam}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-monlam_rignor}
+      REDIS_URL: redis://redis:6379/0
       TRUST_PROXY_HEADERS: "true"
       OTP_DEV_LOG: "false"
     ports:
@@ -41,6 +57,8 @@ services:
       - ./classical-tibetan-grammar-handbook_compress.pdf:/data/knowledge/classical-tibetan-grammar-handbook_compress.pdf:ro
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: unless-stopped
     networks:
@@ -61,6 +79,7 @@ services:
 
 volumes:
   pgdata:
+  redisdata:
 
 networks:
   internal:

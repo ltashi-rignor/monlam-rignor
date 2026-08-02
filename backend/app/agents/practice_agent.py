@@ -317,7 +317,80 @@ def _light_clean_item(raw: dict[str, Any]) -> dict[str, Any] | None:
     return item
 
 
-def sanitize_practice_exercises(payload: dict[str, Any], *, fill_bank: bool = True) -> dict[str, Any]:
+def _particle_distractors(correct: str, wrong: str) -> list[str]:
+    pool = [
+        "ལ",
+        "གིས",
+        "གྱིས",
+        "ཀྱིས",
+        "ནས",
+        "དང་",
+        "གི",
+        "གྱི",
+        "ཀྱི",
+        "ཡིན",
+        "རེད",
+        "ཡོད",
+        "འདུག",
+    ]
+    out: list[str] = []
+    for p in pool:
+        if _norm_key(p) in {_norm_key(correct), _norm_key(wrong)}:
+            continue
+        out.append(p)
+        if len(out) >= 2:
+            break
+    return out
+
+
+def drills_from_seed_mistakes(mistakes: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    """Build correct_sentence drills directly from grammar-check wrong→fix pairs."""
+    drills: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for i, m in enumerate(mistakes or []):
+        if not isinstance(m, dict):
+            continue
+        orig = _as_plain(m.get("original"))
+        corr = _as_plain(m.get("correction"))
+        if not orig or not corr or _norm_key(orig) == _norm_key(corr):
+            continue
+        pkey = _norm_key(f"{orig}|{corr}")
+        if pkey in seen:
+            continue
+        seen.add(pkey)
+        expl = _as_plain(m.get("explanation")) or _as_plain(m.get("related_rule")) or ""
+        options = [corr, orig]
+        if max(len(corr), len(orig)) <= 12:
+            options.extend(_particle_distractors(corr, orig))
+        while len(options) < 4:
+            pad = f"{orig}།" if not orig.endswith("།") else orig[:-1]
+            if _norm_key(pad) not in {_norm_key(o) for o in options}:
+                options.append(pad)
+            else:
+                options.append(f"{corr}་")
+            if len(options) >= 4:
+                break
+        drills.append(
+            {
+                "id": f"seed{i + 1}",
+                "type": "correct_sentence",
+                "prompt": f"ཚིག་འདི་བཅོས། {orig}",
+                "options": options[:4],
+                "answer": corr,
+                "explanation": expl or None,
+            }
+        )
+        if len(drills) >= 8:
+            break
+    return drills
+
+
+def sanitize_practice_exercises(
+    payload: dict[str, Any],
+    *,
+    fill_bank: bool = True,
+    seed_mistakes: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     """Normalize Melong practice JSON into valid, scorable drills."""
     out = dict(payload or {})
     exercises = list(out.get("exercises") or [])
@@ -339,46 +412,95 @@ def sanitize_practice_exercises(payload: dict[str, Any], *, fill_bank: bool = Tr
     free_used = 0
     seen_prompts: set[str] = set()
 
+    def _accept(item: dict[str, Any]) -> bool:
+        nonlocal reorder_used, free_used
+        etype = item["type"]
+        if etype == "reorder_phrase":
+            if reorder_used >= 1:
+                return False
+            reorder_used += 1
+        if etype == "free_write":
+            if free_used >= 1:
+                return False
+            free_used += 1
+        pkey = _norm_key(item.get("prompt") or "")
+        if pkey in seen_prompts:
+            return False
+        seen_prompts.add(pkey)
+        cleaned.append(item)
+        return True
+
+    # When seeded from a grammar check, put wrong→fix drills first so Melong
+    # filler cannot crowd out the actual errors.
+    if seed_mistakes:
+        for bank in drills_from_seed_mistakes(seed_mistakes):
+            if len(cleaned) >= 8:
+                break
+            item = _validate_choice(dict(bank))
+            if item:
+                _accept(item)
+
+    seed_frags = []
+    if seed_mistakes:
+        for m in seed_mistakes:
+            if not isinstance(m, dict):
+                continue
+            for key in ("original", "correction"):
+                frag = _as_plain(m.get(key))
+                if frag and len(_norm_key(frag)) >= 2:
+                    seed_frags.append(_norm_key(frag))
+
+    melong_related: list[dict[str, Any]] = []
+    melong_other: list[dict[str, Any]] = []
     for raw in exercises:
         if not isinstance(raw, dict):
             continue
         item = _validate_choice(dict(raw))
         if not item:
             continue
-        etype = item["type"]
-        if etype == "reorder_phrase":
-            if reorder_used >= 1:
-                continue
-            reorder_used += 1
-        if etype == "free_write":
-            if free_used >= 1:
-                continue
-            free_used += 1
-        pkey = _norm_key(item.get("prompt") or "")
-        if pkey in seen_prompts:
-            continue
-        seen_prompts.add(pkey)
-        cleaned.append(item)
+        blob = _norm_key(
+            (item.get("prompt") or "")
+            + "".join(item.get("options") or [])
+            + (item.get("answer") or "")
+        )
+        related = bool(seed_frags) and any(f in blob for f in seed_frags)
+        (melong_related if related else melong_other).append(item)
 
-    for bank in _BANK:
+    for item in melong_related:
         if len(cleaned) >= 8:
             break
-        item = _validate_choice(dict(bank))
-        if not item:
-            continue
-        pkey = _norm_key(item.get("prompt") or "")
-        if pkey in seen_prompts:
-            continue
-        if item["type"] == "reorder_phrase" and reorder_used >= 1:
-            continue
-        if item["type"] == "free_write" and free_used >= 1:
-            continue
-        if item["type"] == "reorder_phrase":
-            reorder_used += 1
-        if item["type"] == "free_write":
-            free_used += 1
-        seen_prompts.add(pkey)
-        cleaned.append(item)
+        _accept(item)
+
+    # Unrelated Melong drills: full use when adaptive; never when seeded
+    # (seed + related Melong are the practice set).
+    if not seed_mistakes:
+        for item in melong_other:
+            if len(cleaned) >= 8:
+                break
+            _accept(item)
+
+    # Generic bank only for adaptive sets, or if a grammar seed produced nothing usable.
+    use_generic_bank = not seed_mistakes or len(cleaned) == 0
+    if use_generic_bank:
+        for bank in _BANK:
+            if len(cleaned) >= 8:
+                break
+            item = _validate_choice(dict(bank))
+            if not item:
+                continue
+            pkey = _norm_key(item.get("prompt") or "")
+            if pkey in seen_prompts:
+                continue
+            if item["type"] == "reorder_phrase" and reorder_used >= 1:
+                continue
+            if item["type"] == "free_write" and free_used >= 1:
+                continue
+            if item["type"] == "reorder_phrase":
+                reorder_used += 1
+            if item["type"] == "free_write":
+                free_used += 1
+            seen_prompts.add(pkey)
+            cleaned.append(item)
 
     for i, ex in enumerate(cleaned, start=1):
         if not _as_plain(ex.get("id")) or str(ex.get("id")).startswith("bank"):
@@ -394,7 +516,15 @@ def sanitize_practice_exercises(payload: dict[str, Any], *, fill_bank: bool = Tr
     if not _as_plain(out.get("title")):
         out["title"] = "དེ་རིང་གི་སྦྱོང་བརྡར།"
     if not isinstance(out.get("focus_areas"), list) or not out["focus_areas"]:
-        out["focus_areas"] = ["རྣམ་དབྱེ།", "ཡིན་རེད།", "ཕྲད།"]
+        if seed_mistakes:
+            types: list[str] = []
+            for m in seed_mistakes:
+                t = str((m or {}).get("mistake_type") or "").strip()
+                if t and t not in types:
+                    types.append(t)
+            out["focus_areas"] = types[:5] or ['རྣམ་དབྱེ།']
+        else:
+            out["focus_areas"] = ['རྣམ་དབྱེ།', 'ཡིན་རེད་ཡོད་འདུག', 'ཕྲད།']
     return out
 
 
@@ -403,14 +533,38 @@ async def run_practice(
     progress: dict[str, Any],
     focus: str | None = None,
     profile: dict[str, Any] | None = None,
+    *,
+    from_grammar_seed: bool = False,
 ) -> dict[str, Any]:
     llm = get_llm()
     result = await llm.complete_json_async(
         prompts.practice_system(),
-        prompts.practice_user(mistakes, progress, focus, profile),
-        temperature=0.4,
+        prompts.practice_user(
+            mistakes,
+            progress,
+            focus,
+            profile,
+            from_grammar_seed=from_grammar_seed,
+        ),
+        temperature=0.35 if from_grammar_seed else 0.4,
     )
     result.setdefault("title", "དེ་རིང་གི་སྦྱོང་བརྡར།")
     result.setdefault("focus_areas", [])
     result.setdefault("exercises", [])
-    return sanitize_practice_exercises(result, fill_bank=True)
+    # Prefer focus areas from the seed mistake types when Melong omits them.
+    if from_grammar_seed and mistakes:
+        types = []
+        for m in mistakes:
+            t = str((m or {}).get("mistake_type") or "").strip()
+            if t and t not in types:
+                types.append(t)
+        if types and (
+            not isinstance(result.get("focus_areas"), list)
+            or not result.get("focus_areas")
+        ):
+            result["focus_areas"] = types[:5]
+    return sanitize_practice_exercises(
+        result,
+        fill_bank=True,
+        seed_mistakes=mistakes if from_grammar_seed else None,
+    )

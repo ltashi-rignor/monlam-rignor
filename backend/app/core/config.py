@@ -75,6 +75,29 @@ class Settings(BaseSettings):
     grammar_ocr_cache_path: str = str(ROOT / "data" / "grammar_ocr")
     content_path: str = str(ROOT / "data" / "content")
 
+    # Optional botok tokenizer for grammar cleanup / case spans / RAG queries.
+    # Fail-open to regex when pack missing. Pack path: BOTOK_BASE_PATH/<dialect>.
+    grammar_use_botok: bool = True
+    botok_base_path: str = str(ROOT / "data" / "botok")
+    botok_dialect_name: str = "general"
+
+    # Optional Redis — grammar/RAG caches + rate limits (fail-open to memory).
+    # Empty REDIS_URL keeps in-process caches only.
+    redis_url: str = ""
+    redis_prefix: str = "mr"
+
+    # Grammar check speed: caches + tighter LLM budget.
+    # With Redis: shared across workers/restarts; memory is still used as L1.
+    grammar_result_cache_ttl_s: float = 1800.0
+    grammar_result_cache_size: int = 64
+    grammar_rag_cache_ttl_s: float = 1800.0
+    grammar_rag_cache_size: int = 128
+    # Cap Anthropic/Melong wait so a slow call falls back to rules+RAG.
+    grammar_llm_timeout_s: float = 25.0
+    grammar_llm_max_tokens: int = 1800
+    # How many botok/probe particle queries to fuse into RAG (each = 1 embed).
+    grammar_rag_max_particle_queries: int = 1
+
     app_name: str = "Monlam Rignor"
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     backend_host: str = "0.0.0.0"
@@ -194,6 +217,10 @@ class Settings(BaseSettings):
     @property
     def content_dir(self) -> Path:
         return self.resolve_path(self.content_path)
+
+    @property
+    def botok_base_dir(self) -> Path:
+        return self.resolve_path(self.botok_base_path)
 
 
 @lru_cache

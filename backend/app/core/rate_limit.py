@@ -1,4 +1,4 @@
-"""In-process sliding-window rate limiter (per-key).
+"""Sliding-window rate limiter — Redis when available, else in-process memory.
 
 IP identity: only honor X-Forwarded-For when TRUST_PROXY_HEADERS=true
 (set behind a known reverse proxy that overwrites that header).
@@ -6,13 +6,17 @@ IP identity: only honor X-Forwarded-For when TRUST_PROXY_HEADERS=true
 
 from __future__ import annotations
 
+import logging
 import time
+import uuid
 from collections import defaultdict, deque
 from threading import Lock
 
 from fastapi import HTTPException, Request
 
 from app.core.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 _lock = Lock()
 _buckets: dict[str, deque[float]] = defaultdict(deque)
@@ -32,8 +36,7 @@ def _client_ip(request: Request) -> str:
     return "unknown"
 
 
-def check_rate_limit(key: str, *, limit: int, window_seconds: float) -> None:
-    """Raise 429 if `key` exceeded `limit` events in the sliding window."""
+def _check_rate_limit_memory(key: str, *, limit: int, window_seconds: float) -> None:
     now = time.monotonic()
     cutoff = now - window_seconds
     with _lock:
@@ -46,6 +49,50 @@ def check_rate_limit(key: str, *, limit: int, window_seconds: float) -> None:
                 detail="Too many requests. Please wait and try again.",
             )
         q.append(now)
+
+
+def _check_rate_limit_redis(key: str, *, limit: int, window_seconds: float) -> bool:
+    """Return True if Redis handled the check; False to fall back to memory."""
+    from app.services.redis_client import get_redis, redis_key
+
+    client = get_redis()
+    if client is None:
+        return False
+
+    rkey = redis_key("rl", key)
+    now = time.time()
+    cutoff = now - float(window_seconds)
+    member = f"{now:.6f}:{uuid.uuid4().hex[:10]}"
+    try:
+        pipe = client.pipeline()
+        pipe.zremrangebyscore(rkey, 0, cutoff)
+        pipe.zcard(rkey)
+        pipe.zadd(rkey, {member: now})
+        pipe.expire(rkey, max(1, int(window_seconds) + 1))
+        _rem, count, _add, _exp = pipe.execute()
+        if int(count) >= limit:
+            # Undo the add so rejected requests don't consume the budget.
+            try:
+                client.zrem(rkey, member)
+            except Exception:
+                pass
+            raise HTTPException(
+                status_code=429,
+                detail="Too many requests. Please wait and try again.",
+            )
+        return True
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.debug("Redis rate limit failed (%s); memory fallback", type(exc).__name__)
+        return False
+
+
+def check_rate_limit(key: str, *, limit: int, window_seconds: float) -> None:
+    """Raise 429 if `key` exceeded `limit` events in the sliding window."""
+    if _check_rate_limit_redis(key, limit=limit, window_seconds=window_seconds):
+        return
+    _check_rate_limit_memory(key, limit=limit, window_seconds=window_seconds)
 
 
 def rate_limit_auth(request: Request, *, action: str, email: str | None = None) -> None:

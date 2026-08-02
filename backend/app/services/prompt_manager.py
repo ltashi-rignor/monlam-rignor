@@ -110,7 +110,14 @@ def grammar_system() -> str:
         "mistakes OR one span that fixes both. Never fix only the final verb and leave "
         "a bad agentive (e.g. སློབ་གྲྭ་བས་ཞིག་རེད → སློབ་གྲྭ་བ་ཞིག་ཡིན).\n"
         "Also return corrected_version = the FULL student text with ALL simple errors fixed.\n"
-        "source_ref: 'simple-rules · རྣམ་དབྱེ' or 'simple-rules · ཡིན/རེད/ཡོད/འདུག'.\n"
+        "source_ref: prefer handbook cite when handbook excerpts are provided "
+        "(e.g. 'classical-tibetan-grammar-handbook · p.12' or "
+        "'hopkins-napper-grammar-summaries · p.3'); otherwise "
+        "'simple-rules · རྣམ་དབྱེ' or 'simple-rules · ཡིན/རེད/ཡོད/འདུག'.\n"
+        "When handbook excerpts are in the user message: ground related_rule / "
+        "explanation in those passages; cite page/source in source_ref; "
+        "do NOT invent handbook quotes that are not in the excerpts. "
+        "Still only report V1 simple errors — handbook may clarify, not expand scope.\n"
         "Report ALL obvious simple errors (up to 12). If unsure about a span → omit it.\n"
         "When clean: mistakes [], related_rules [], practice_questions [], "
         "corrected_version unchanged, summary null, praise one short Tibetan sentence.\n"
@@ -147,12 +154,20 @@ def grammar_user(
                 parts.append(f"[{i}] {title}{page_bit}\n{content}")
         if parts:
             handbook = (
-                "\nOptional Classical Tibetan Grammar Handbook excerpts "
-                "(use only if they clarify a simple V1 case/copula issue; "
-                "do not invent complex errors from them):\n"
+                "\nRetrieved grammar handbook passages (pgvector similarity search — "
+                "REQUIRED grounding for related_rule / explanation / source_ref when "
+                "they clarify a V1 case/copula/evidentiality issue. "
+                "Cite the passage number or page in source_ref. "
+                "Do NOT invent quotes absent from these excerpts. "
+                "Do NOT invent complex errors just because a passage mentions them):\n"
                 + "\n\n".join(parts)
                 + "\n"
             )
+    else:
+        handbook = (
+            "\n(No handbook passages retrieved — rely on MASTER ERROR KEY + "
+            "simple rules only; source_ref may use simple-rules.)\n"
+        )
     return (
         f"{profile_block}"
         f"{handbook}"
@@ -309,20 +324,58 @@ def practice_user(
     progress: dict[str, Any],
     focus: str | None,
     profile: dict[str, Any] | None = None,
+    *,
+    from_grammar_seed: bool = False,
 ) -> str:
     from app.core.learner_profile import format_profile_for_prompt
 
     profile_block = (
         f"Learner profile:\n{format_profile_for_prompt(profile)}\n\n" if profile else ""
     )
+    # Compact, explicit mistake lines so Melong cannot ignore them.
+    mistake_lines: list[str] = []
+    for i, m in enumerate(mistakes or [], start=1):
+        if not isinstance(m, dict):
+            continue
+        orig = str(m.get("original") or "").strip()
+        corr = str(m.get("correction") or "").strip()
+        mtype = str(m.get("mistake_type") or "").strip()
+        rule = str(m.get("related_rule") or "").strip()
+        if not orig and not corr:
+            continue
+        bit = f"{i}. type={mtype or '—'} | wrong={orig or '—'} | fix={corr or '—'}"
+        if rule:
+            bit += f" | rule={rule}"
+        mistake_lines.append(bit)
+    mistakes_block = "\n".join(mistake_lines) if mistake_lines else "(no seed mistakes)"
+
+    seed_rules = ""
+    if from_grammar_seed and mistake_lines:
+        seed_rules = (
+            "CRITICAL — these are the learner's JUST-FOUND grammar-check errors. "
+            "Every drill MUST practice one of these exact error patterns "
+            "(same particle/copula/case issue and similar sentence shape). "
+            "Use wrong→fix pairs as templates: e.g. correct_sentence showing the wrong "
+            "form, or fill_blank/particle_pick for the missing particle/copula. "
+            "Do NOT invent unrelated vocab/honorific/theme drills. "
+            "Cover as many of the listed mistakes as possible across the 8 drills "
+            "(repeat a pattern with a new sentence if fewer than 8 mistakes).\n"
+        )
+    elif mistake_lines:
+        seed_rules = (
+            "Build drills primarily from the listed mistakes (same error types and forms). "
+            "Avoid unrelated topics when mistakes are present.\n"
+        )
+
     return (
         f"{profile_block}"
         "Create today's Tibetan practice set — exactly 8 interactive drills.\n"
-        f"Recent mistakes:\n{mistakes}\n\n"
+        f"{seed_rules}"
+        f"Target mistakes (primary source of truth):\n{mistakes_block}\n\n"
         f"Progress snapshot:\n{progress}\n\n"
-        f"Optional focus: {focus or 'adaptive from mistakes and profile'}\n"
-        "Assign each drill a clear skill (particle, case, copula, vocab, honorific). "
-        "Prefer fill_blank + particle_pick + correct_sentence. "
+        f"Optional focus: {focus or 'adaptive from the target mistakes'}\n"
+        "focus_areas[] MUST name the mistake types you practiced (Tibetan). "
+        "Prefer fill_blank + particle_pick + correct_sentence built from the target mistakes. "
         "At most one reorder_phrase (single sentence chunks + 4 full-sentence options). "
         "Reject bad patterns: numbered paragraph ordering; options '1, 2, 3, 4'; "
         "answer not in options; duplicate options. "

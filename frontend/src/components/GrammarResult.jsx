@@ -148,10 +148,30 @@ export default function GrammarResult({ result, originalText, onApplyCorrection 
       if (label && !types.includes(label)) types.push(label)
       if (types.length >= 2) break
     }
-    const q = new URLSearchParams({ from: 'grammar', auto: '1' })
+    const q = new URLSearchParams({ from: 'grammar', auto: '1', seed: '1' })
     if (types.length) q.set('focus', types.join(' · '))
     return `/practice?${q.toString()}`
   }, [all])
+
+  function stashMistakesForPractice() {
+    // Practice page reads this seed so drills target THIS check's errors.
+    try {
+      const seed = all
+        .filter((m) => (m.original || m.correction))
+        .slice(0, 12)
+        .map((m) => ({
+          mistake_type: m.mistake_type || 'grammar',
+          original: m.original || '',
+          correction: m.correction || '',
+          explanation: m.explanation || null,
+          related_rule: m.related_rule || null,
+          source_ref: m.source_ref || null,
+        }))
+      sessionStorage.setItem('mr_practice_seed_mistakes', JSON.stringify(seed))
+    } catch {
+      /* ignore quota / private mode */
+    }
+  }
 
   function focusMistake(index, original) {
     // Prefer exact original match among combined list
@@ -201,7 +221,7 @@ export default function GrammarResult({ result, originalText, onApplyCorrection 
       {!isClean && (
         <div className="grammar-practice-cta">
           <p>{t.grammar.practiceMistakesHint}</p>
-          <Link className="btn btn-accent" to={practiceHref}>
+          <Link className="btn btn-accent" to={practiceHref} onClick={stashMistakesForPractice}>
             {t.grammar.practiceTheseMistakes}
           </Link>
         </div>
@@ -287,7 +307,12 @@ export default function GrammarResult({ result, originalText, onApplyCorrection 
               <PracticePrompt key={i} question={q} index={i} />
             ))}
           </div>
-          <Link className="btn btn-accent" to={practiceHref} style={{ marginTop: 8 }}>
+          <Link
+            className="btn btn-accent"
+            to={practiceHref}
+            style={{ marginTop: 8 }}
+            onClick={stashMistakesForPractice}
+          >
             {t.grammar.practiceTheseMistakes}
           </Link>
         </section>

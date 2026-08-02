@@ -23,6 +23,17 @@ services:
       - "1025:1025"
       - "8025:8025"
 
+  redis:
+    image: redis:7-alpine
+    container_name: monlam-rignor-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   backend:
     build:
       context: ./backend
@@ -33,6 +44,7 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://monlam:monlam@db:5432/monlam_rignor
       DATABASE_URL_SYNC: postgresql://monlam:monlam@db:5432/monlam_rignor
+      REDIS_URL: redis://redis:6379/0
       SMTP_HOST: mailpit
       SMTP_PORT: 1025
     ports:
@@ -43,6 +55,8 @@ services:
       - ./classical-tibetan-grammar-handbook_compress.pdf:/data/knowledge/classical-tibetan-grammar-handbook_compress.pdf:ro
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       mailpit:
         condition: service_started

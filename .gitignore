@@ -53,3 +53,7 @@ pgdata/
 # OCR page caches (png + txt) from grammar ingest
 data/grammar_ocr/
 
+# botok dialect pack (downloaded / vendored locally — keep README)
+data/botok/*
+!data/botok/README.md
+
