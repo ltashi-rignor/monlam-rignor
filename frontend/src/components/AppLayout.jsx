@@ -3,6 +3,7 @@ import { NavLink, Outlet, Navigate, useLocation } from 'react-router-dom'
 import BrandLogo from './BrandLogo'
 import ErrorBoundary from './ErrorBoundary'
 import { useI18n } from '../i18n/useI18n'
+import { getStoredTheme, toggleTheme } from '../lib/theme'
 import { useAuthStore } from '../store/authStore'
 
 const DRAWER_MQ = '(max-width: 1024px)'
@@ -36,10 +37,15 @@ export default function AppLayout() {
   const logout = useAuthStore((s) => s.logout)
   const location = useLocation()
   const [navOpen, setNavOpen] = useState(false)
+  const [theme, setTheme] = useState(() => getStoredTheme())
   const [isCompact, setIsCompact] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia(DRAWER_MQ).matches : false,
   )
   const titleId = useId()
+
+  function onToggleTheme() {
+    setTheme(toggleTheme())
+  }
 
   const groups = useMemo(
     () => [
@@ -179,6 +185,14 @@ export default function AppLayout() {
             EN
           </button>
         </div>
+        <button
+          type="button"
+          className="cms-icon-btn app-topbar-theme"
+          onClick={onToggleTheme}
+          aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        >
+          {theme === 'dark' ? '☀' : '☾'}
+        </button>
       </header>
 
       <div
@@ -274,12 +288,22 @@ export default function AppLayout() {
         </nav>
 
         <div className="sidebar-footer">
-          <div className="cms-lang sidebar-lang" role="group" aria-label="Language">
-            <button type="button" className={lang === 'bo' ? 'is-active' : ''} onClick={() => setLang('bo')}>
-              བོད།
-            </button>
-            <button type="button" className={lang === 'en' ? 'is-active' : ''} onClick={() => setLang('en')}>
-              EN
+          <div className="sidebar-footer-tools">
+            <div className="cms-lang sidebar-lang" role="group" aria-label="Language">
+              <button type="button" className={lang === 'bo' ? 'is-active' : ''} onClick={() => setLang('bo')}>
+                བོད།
+              </button>
+              <button type="button" className={lang === 'en' ? 'is-active' : ''} onClick={() => setLang('en')}>
+                EN
+              </button>
+            </div>
+            <button
+              type="button"
+              className="sidebar-theme-btn"
+              onClick={onToggleTheme}
+              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {theme === 'dark' ? '☀' : '☾'}
             </button>
           </div>
           <div className="sidebar-user">

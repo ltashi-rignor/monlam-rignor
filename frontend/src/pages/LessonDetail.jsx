@@ -4,6 +4,7 @@ import { api, clearApiCache } from '../api/client'
 import { useModuleProgress } from '../hooks/useModuleProgress'
 import { useTibetanVoice } from '../hooks/useTibetanVoice'
 import VoicePicker from '../components/VoicePicker'
+import VoicePlaybackBar from '../components/VoicePlaybackBar'
 import OfflineBanner from '../components/OfflineBanner'
 import WorkingProgress from '../components/WorkingProgress'
 import { playFanfare, playLose, playWin, unlockAudio } from '../lib/gameSfx'
@@ -93,7 +94,8 @@ export default function LessonDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { submitQuiz } = useModuleProgress()
-  const { speak, voice, setVoice } = useTibetanVoice()
+  const { speak, voice, setVoice, loading: ttsBusy, playing: ttsPlaying, playbackProgress } =
+    useTibetanVoice()
   const [lesson, setLesson] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -101,6 +103,8 @@ export default function LessonDetail() {
   const [maxStep, setMaxStep] = useState(0)
   const [flipped, setFlipped] = useState({})
   const [heard, setHeard] = useState({})
+  const [speakingKey, setSpeakingKey] = useState(null)
+  const [playAllBusy, setPlayAllBusy] = useState(false)
   const [dialogueIdx, setDialogueIdx] = useState(0)
   const [showEn, setShowEn] = useState({})
   const [revealedNotes, setRevealedNotes] = useState({})
@@ -216,9 +220,13 @@ export default function LessonDetail() {
   async function onSpeak(text, key) {
     unlockAudio()
     if (!text) return
-    await speak(text)
-    if (key != null) setHeard((h) => ({ ...h, [key]: true }))
-    await new Promise((r) => setTimeout(r, Math.min(3200, 500 + String(text).length * 70)))
+    setSpeakingKey(key ?? 'line')
+    try {
+      await speak(text)
+      if (key != null) setHeard((h) => ({ ...h, [key]: true }))
+    } finally {
+      setSpeakingKey(null)
+    }
   }
 
   function flipCard(wid) {
@@ -259,12 +267,19 @@ export default function LessonDetail() {
   }
 
   async function playDialogueAll() {
+    if (playAllBusy) return
     unlockAudio()
-    for (let i = 0; i < dialogue.length; i += 1) {
-      setDialogueIdx(i)
-      const line = dialogue[i]
-      if (line?.tibetan) await onSpeak(line.tibetan)
-      else await new Promise((r) => setTimeout(r, 400))
+    setPlayAllBusy(true)
+    try {
+      for (let i = 0; i < dialogue.length; i += 1) {
+        setDialogueIdx(i)
+        const line = dialogue[i]
+        if (line?.tibetan) await onSpeak(line.tibetan, `dlg-${i}`)
+        else await new Promise((r) => setTimeout(r, 400))
+      }
+    } finally {
+      setPlayAllBusy(false)
+      setSpeakingKey(null)
     }
   }
 
@@ -306,6 +321,16 @@ export default function LessonDetail() {
   const focus = tibetanOrFallback(lesson.focus, '')
   const allQuizAnswered = quiz.length > 0 && Object.keys(locked).length >= quiz.length
   const wordsHeard = Object.keys(heard).length
+  const voiceActive = ttsBusy || ttsPlaying
+  const renderVoiceBar = (extraClass = '') => (
+    <VoicePlaybackBar
+      active={voiceActive}
+      indeterminate={ttsBusy && !ttsPlaying}
+      value={playbackProgress}
+      label={t.modules.tapSpeak}
+      className={`lesson-voice-bar ${extraClass}`.trim()}
+    />
+  )
 
   return (
     <div className="module-page lesson-detail-page lesson-play tibetan">
@@ -410,12 +435,21 @@ export default function LessonDetail() {
           <p className="muted">
             {t.modules.tapFlip} · {t.modules.heard} {wordsHeard}/{words.length}
           </p>
+          {voiceActive && speakingKey != null && !String(speakingKey).startsWith('dlg-')
+            ? renderVoiceBar()
+            : null}
           <div className="flip-grid">
             {words.map((w) => {
               const isFlip = flipped[w.id]
               const isHeard = heard[w.id]
+              const isSpeaking = speakingKey === w.id && voiceActive
               return (
-                <div key={w.id} className={`flip-card ${isFlip ? 'is-flipped' : ''} ${isHeard ? 'is-heard' : ''}`}>
+                <div
+                  key={w.id}
+                  className={`flip-card ${isFlip ? 'is-flipped' : ''} ${isHeard ? 'is-heard' : ''} ${
+                    isSpeaking ? 'is-speaking' : ''
+                  }`}
+                >
                   <button type="button" className="flip-face flip-front" onClick={() => flipCard(w.id)}>
                     <span className="tibetan flip-bo">{w.tibetan}</span>
                     <span className="muted flip-hint">{t.modules.tapFlip}</span>
@@ -440,9 +474,12 @@ export default function LessonDetail() {
                     <button
                       type="button"
                       className="btn btn-accent flip-speak"
+                      disabled={voiceActive || playAllBusy}
                       onClick={() => onSpeak(w.tibetan, w.id)}
                     >
-                      {t.modules.tapSpeak}
+                      {speakingKey === w.id && voiceActive
+                        ? t.speak?.playing || '…'
+                        : t.modules.tapSpeak}
                     </button>
                   </div>
                 </div>
@@ -458,8 +495,13 @@ export default function LessonDetail() {
           <p className="module-eyebrow">03</p>
           <h2>{t.modules.readAlong}</h2>
           <div className="dialogue-play-head">
-            <button type="button" className="btn btn-ghost" onClick={playDialogueAll}>
-              {t.modules.playAllLines}
+            <button
+              type="button"
+              className="btn btn-ghost"
+              disabled={playAllBusy || voiceActive}
+              onClick={playDialogueAll}
+            >
+              {playAllBusy ? t.speak?.playing || t.modules.playAllLines : t.modules.playAllLines}
             </button>
             <span className="meta" dir="ltr">
               {Math.min(dialogueIdx + 1, dialogue.length)}/{dialogue.length}
@@ -470,22 +512,27 @@ export default function LessonDetail() {
               if (i > dialogueIdx) return null
               const visible = i <= dialogueIdx
               const enOn = showEn[i]
+              const isSpeaking = speakingKey === `dlg-${i}` && voiceActive
               return (
                 <div
                   key={i}
-                  className={`dialogue-line lesson-step-enter ${line.speaker === 'B' ? 'is-b' : ''} ${visible ? 'is-show' : ''}`}
+                  className={`dialogue-line lesson-step-enter ${line.speaker === 'B' ? 'is-b' : ''} ${
+                    visible ? 'is-show' : ''
+                  } ${isSpeaking ? 'is-speaking' : ''}`}
                 >
                   <div className="dialogue-speaker">{line.speaker}</div>
                   <div className="dialogue-bubble">
                     <button
                       type="button"
                       className="dialogue-speak-btn"
-                      onClick={() => onSpeak(line.tibetan)}
+                      disabled={voiceActive || playAllBusy}
+                      onClick={() => onSpeak(line.tibetan, `dlg-${i}`)}
                     >
                       <div className="tibetan" style={{ fontSize: '1.35rem', color: 'var(--teal-mid)' }}>
                         {line.tibetan}
                       </div>
                     </button>
+                    {isSpeaking ? renderVoiceBar('is-inline') : null}
                     {line.wylie && (
                       <div className="muted" dir="ltr" style={{ fontStyle: 'italic' }}>
                         {line.wylie}

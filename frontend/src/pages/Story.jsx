@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api/client'
 import SpeakDrill, { drillsFromStory } from '../components/SpeakDrill'
 import VoicePicker from '../components/VoicePicker'
+import VoicePlaybackBar from '../components/VoicePlaybackBar'
 import WorkingProgress from '../components/WorkingProgress'
 import { useTibetanVoice } from '../hooks/useTibetanVoice'
 import { useI18n } from '../i18n/useI18n'
@@ -28,7 +29,8 @@ function isTibetanToken(tok) {
 
 export default function Story() {
   const { t, isEn, lang } = useI18n()
-  const { voice, setVoice, speak, stop, loading: ttsBusy } = useTibetanVoice()
+  const { voice, setVoice, speak, stop, loading: ttsBusy, playing: ttsPlaying, playbackProgress } =
+    useTibetanVoice()
   const [characterCount, setCharacterCount] = useState(2)
   const [names, setNames] = useState(() => blankNames(2))
   const [actions, setActions] = useState('')
@@ -292,10 +294,16 @@ export default function Story() {
               {mode === 'speak' && (
                 <div className="story-speak-wrap">
                   <p className="muted story-speak-hint">{t.story.speakHint}</p>
-                  <SpeakDrill
-                    drills={speakDrills}
-                    voiceApi={{ speak, stop, loading: ttsBusy }}
-                  />
+                    <SpeakDrill
+                      drills={speakDrills}
+                      voiceApi={{
+                        speak,
+                        stop,
+                        loading: ttsBusy,
+                        playing: ttsPlaying,
+                        playbackProgress,
+                      }}
+                    />
                 </div>
               )}
 
@@ -327,18 +335,25 @@ export default function Story() {
                     <button
                       type="button"
                       className="btn btn-primary"
-                      disabled={ttsBusy}
+                      disabled={ttsBusy || ttsPlaying}
                       onClick={() => {
                         const line = String(current.text || '').trim()
                         if (line) speak(line)
                       }}
                     >
-                      {t.story.listen}
+                      {ttsBusy || ttsPlaying ? t.speak.playing : t.story.listen}
                     </button>
                     <button type="button" className="btn btn-ghost" onClick={() => stop()}>
                       {t.story.stopAudio}
                     </button>
                   </div>
+                  <VoicePlaybackBar
+                    active={ttsBusy || ttsPlaying}
+                    indeterminate={ttsBusy && !ttsPlaying}
+                    value={playbackProgress}
+                    label={t.story.listen}
+                    className="story-voice-bar"
+                  />
                   <p className="muted story-tap-hint">{t.story.tapWord}</p>
                 </article>
               )}

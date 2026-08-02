@@ -70,21 +70,30 @@ async function fadeVolume(audio, to, ms = 140) {
   }
 }
 
-function playUrl(audioRef, url, { volume = 1, settleRef } = {}) {
+function playUrl(audioRef, url, { volume = 1, settleRef, onProgress } = {}) {
   return new Promise((resolve, reject) => {
     const a = new Audio(url)
     a.volume = volume
     audioRef.current = a
+    const report = (ratio) => {
+      if (typeof onProgress === 'function') onProgress(ratio)
+    }
     const settle = (ok) => {
       if (settleRef && settleRef.current === settle) settleRef.current = null
       if (audioRef.current === a) audioRef.current = null
+      report(ok ? 1 : 0)
       resolve(ok)
     }
     if (settleRef) settleRef.current = settle
+    a.ontimeupdate = () => {
+      const d = a.duration
+      if (d && Number.isFinite(d) && d > 0) report(Math.min(1, a.currentTime / d))
+    }
     a.onended = () => settle(true)
     a.onerror = () => {
       if (settleRef && settleRef.current === settle) settleRef.current = null
       if (audioRef.current === a) audioRef.current = null
+      report(0)
       reject(new Error('Playback failed'))
     }
     a.play().catch(reject)
@@ -94,10 +103,13 @@ function playUrl(audioRef, url, { volume = 1, settleRef } = {}) {
 export function useTibetanVoice() {
   const [voice, setVoice] = useState(() => localStorage.getItem(STORAGE_KEY) || 'lhasa_female')
   const [loading, setLoading] = useState(false)
+  const [playing, setPlaying] = useState(false)
+  const [playbackProgress, setPlaybackProgress] = useState(0)
   const [error, setError] = useState('')
   const audioRef = useRef(null)
   const fillerRef = useRef(null)
   const speakSettleRef = useRef(null)
+  const speakGenRef = useRef(0)
   const voiceRef = useRef(voice)
   const lastFillerRef = useRef('')
   const lastWaitMsRef = useRef(1200)
@@ -126,8 +138,12 @@ export function useTibetanVoice() {
   }, [voice])
 
   const stop = useCallback(() => {
+    speakGenRef.current += 1
     const settle = speakSettleRef.current
     stopEl(audioRef)
+    setPlaying(false)
+    setPlaybackProgress(0)
+    setLoading(false)
     if (settle) {
       speakSettleRef.current = null
       settle(false) // interrupted
@@ -185,25 +201,44 @@ export function useTibetanVoice() {
   const speak = useCallback(
     async (text, { crossfadeFiller = true } = {}) => {
       if (!text) return false
+      // Interrupt any in-flight clip; stop() bumps the generation token.
+      stop()
+      const gen = speakGenRef.current
       setError('')
       setLoading(true)
-      stop()
+      setPlaying(false)
+      setPlaybackProgress(0)
       const voiceName = voiceRef.current
       try {
         const url = await fetchTtsUrl(text, voiceName)
+        if (gen !== speakGenRef.current) return false
         if (!url) throw new Error('No audio returned')
         if (crossfadeFiller && fillerRef.current) {
           await stopFiller({ fade: true })
         } else {
           await stopFiller({ fade: false })
         }
-        return await playUrl(audioRef, url, { volume: 1, settleRef: speakSettleRef })
+        if (gen !== speakGenRef.current) return false
+        setLoading(false)
+        setPlaying(true)
+        setPlaybackProgress(0)
+        const ok = await playUrl(audioRef, url, {
+          volume: 1,
+          settleRef: speakSettleRef,
+          onProgress: (ratio) => {
+            if (gen === speakGenRef.current) setPlaybackProgress(ratio)
+          },
+        })
+        return ok
       } catch {
-        setError('Voice unavailable')
+        if (gen === speakGenRef.current) setError('Voice unavailable')
         await stopFiller({ fade: false })
         return false
       } finally {
-        setLoading(false)
+        if (gen === speakGenRef.current) {
+          setLoading(false)
+          setPlaying(false)
+        }
       }
     },
     [stop, stopFiller],
@@ -222,6 +257,8 @@ export function useTibetanVoice() {
     stopFiller,
     noteWaitMs,
     loading,
+    playing,
+    playbackProgress,
     error,
   }
 }

@@ -27,6 +27,21 @@ const LISTEN_GRACE_MS = 500
 /** Wait after TTS before opening mic — stops the model from "hearing" itself. */
 const POST_SPEAK_COOLDOWN_MS = 900
 
+/** Grapheme-safe chunks for Tibetan / Latin typewriter reveal. */
+function textUnits(text) {
+  const s = text || ''
+  if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+    try {
+      return [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(s)].map(
+        (seg) => seg.segment,
+      )
+    } catch {
+      /* fall through */
+    }
+  }
+  return Array.from(s)
+}
+
 function pickRecorderMime() {
   if (typeof MediaRecorder === 'undefined') return ''
   const candidates = [
@@ -82,6 +97,7 @@ export default function Tutor() {
   const phaseRef = useRef('idle')
   const vadCleanupRef = useRef(null)
   const turnGenRef = useRef(0)
+  const typeGenRef = useRef(0)
   const voiceHistoryRef = useRef([{ role: 'assistant', content: VOICE_GREETING }])
 
   const beginListenRef = useRef(async () => {})
@@ -89,6 +105,34 @@ export default function Tutor() {
   const voiceTurnRef = useRef(async () => {})
 
   const { voice, setVoice, speak, stop, playFiller, stopFiller, noteWaitMs } = useTibetanVoice()
+
+  const typeAssistantReply = useCallback(async (baseMsgs, fullText, meta = {}) => {
+    const gen = ++typeGenRef.current
+    const units = textUnits(fullText || '…')
+    const draft = {
+      role: 'assistant',
+      content: '',
+      typing: true,
+      usedRag: !!meta.usedRag,
+      sources: meta.sources || [],
+    }
+    setMessages([...baseMsgs, draft])
+
+    // Adaptive pace: short replies feel deliberate; long ones stay snappy.
+    const stepMs = units.length > 220 ? 10 : units.length > 100 ? 14 : 22
+    const charsPerTick = units.length > 280 ? 3 : units.length > 140 ? 2 : 1
+
+    let i = 0
+    while (i < units.length) {
+      if (gen !== typeGenRef.current) return
+      i = Math.min(units.length, i + charsPerTick)
+      const content = units.slice(0, i).join('')
+      setMessages([...baseMsgs, { ...draft, content, typing: i < units.length }])
+      await new Promise((r) => window.setTimeout(r, stepMs))
+    }
+    if (gen !== typeGenRef.current) return
+    setMessages([...baseMsgs, { ...draft, content: units.join(''), typing: false }])
+  }, [])
 
   const setPhase = useCallback((p) => {
     phaseRef.current = p
@@ -146,9 +190,13 @@ export default function Tutor() {
 
   useEffect(() => {
     if (tab !== 'voice') endCall()
+    else typeGenRef.current += 1
   }, [tab]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => () => endCall(), [endCall])
+  useEffect(() => () => {
+    typeGenRef.current += 1
+    endCall()
+  }, [endCall])
 
   const startVad = useCallback((stream, onSilenceEnd) => {
     if (vadCleanupRef.current) {
@@ -361,6 +409,7 @@ export default function Tutor() {
     const text = (prompt ?? input).trim()
     if (!text || busy) return
     setErr('')
+    typeGenRef.current += 1
     const nextMsgs = [...messages, { role: 'user', content: text }]
     setMessages(nextMsgs)
     setInput('')
@@ -370,15 +419,10 @@ export default function Tutor() {
         nextMsgs.map(({ role, content }) => ({ role, content })),
         'text',
       )
-      setMessages([
-        ...nextMsgs,
-        {
-          role: 'assistant',
-          content: data.reply || '…',
-          usedRag: !!data.used_rag,
-          sources: data.retrieved_sources || [],
-        },
-      ])
+      await typeAssistantReply(nextMsgs, data.reply || '…', {
+        usedRag: !!data.used_rag,
+        sources: data.retrieved_sources || [],
+      })
     } catch (e) {
       setErr(e.message)
     } finally {
@@ -497,17 +541,30 @@ export default function Tutor() {
               <div key={i} className={`tutor-msg ${m.role === 'user' ? 'is-user' : 'is-ai'}`}>
                 <div className="tutor-avatar">{m.role === 'user' ? 'ཁྱེད།' : 'བློ།'}</div>
                 <div className="tutor-bubble-wrap">
-                  <div className="tutor-bubble tibetan">{m.content}</div>
-                  {m.role === 'assistant' && m.usedRag && (
+                  <div
+                    className={`tutor-bubble tibetan${m.typing ? ' is-typing' : ''}`}
+                    aria-busy={m.typing ? 'true' : undefined}
+                  >
+                    {m.content}
+                    {m.typing ? <span className="tutor-caret" aria-hidden /> : null}
+                  </div>
+                  {m.role === 'assistant' && m.usedRag && !m.typing && (
                     <p className="tutor-rag-note muted">{t.modules.tutorFromHandbook}</p>
                   )}
                 </div>
               </div>
             ))}
-            {busy && (
+            {busy && !messages.some((m) => m.typing) && (
               <div className="tutor-msg is-ai">
                 <div className="tutor-avatar">བློ།</div>
-                <div className="tutor-bubble muted">{t.modules.thinking}</div>
+                <div className="tutor-bubble tutor-bubble-thinking muted">
+                  <span className="tutor-thinking-dots" aria-hidden>
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                  {t.modules.thinking}
+                </div>
               </div>
             )}
             {err && <p className="error">{err}</p>}

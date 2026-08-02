@@ -3,6 +3,7 @@ import { api } from '../api/client'
 import { listenMsForSentence } from '../data/speakSentences'
 import { playFanfare, playLose, unlockAudio } from '../lib/gameSfx'
 import { useTibetanVoice } from '../hooks/useTibetanVoice'
+import VoicePlaybackBar from './VoicePlaybackBar'
 import { useI18n } from '../i18n/useI18n'
 
 const BAR_COUNT = 7
@@ -43,7 +44,13 @@ function scoreBand(score) {
 export default function SpeakDrill({ drills = [], voiceApi = null }) {
   const { t } = useI18n()
   const localVoice = useTibetanVoice()
-  const { speak, stop, loading: ttsBusy } = voiceApi || localVoice
+  const {
+    speak,
+    stop,
+    loading: ttsBusy,
+    playing: ttsPlaying = false,
+    playbackProgress = 0,
+  } = voiceApi || localVoice
   const [index, setIndex] = useState(0)
   const [phase, setPhase] = useState('ready')
   const [heard, setHeard] = useState('')
@@ -51,6 +58,7 @@ export default function SpeakDrill({ drills = [], voiceApi = null }) {
   const [error, setError] = useState('')
   const [level, setLevel] = useState(0)
   const [secondsLeft, setSecondsLeft] = useState(0)
+  const [listenProgress, setListenProgress] = useState(0)
   const [modelPlaying, setModelPlaying] = useState(false)
 
   const mediaRef = useRef(null)
@@ -113,6 +121,7 @@ export default function SpeakDrill({ drills = [], voiceApi = null }) {
     audioCtxRef.current = null
     setLevel(0)
     setSecondsLeft(0)
+    setListenProgress(0)
   }
 
   useEffect(() => () => teardownMic(), [])
@@ -190,6 +199,7 @@ export default function SpeakDrill({ drills = [], voiceApi = null }) {
     setPhase('listening')
     const listenMs = listenMsForSentence(current.prompt)
     setSecondsLeft(Math.ceil(listenMs / 1000))
+    setListenProgress(0)
     chunksRef.current = []
 
     try {
@@ -263,9 +273,11 @@ export default function SpeakDrill({ drills = [], voiceApi = null }) {
       recorder.start(200)
       const started = Date.now()
       tickRef.current = window.setInterval(() => {
-        const left = Math.max(0, listenMs - (Date.now() - started))
+        const elapsed = Date.now() - started
+        const left = Math.max(0, listenMs - elapsed)
         setSecondsLeft(Math.ceil(left / 1000))
-      }, 200)
+        setListenProgress(Math.min(1, elapsed / listenMs))
+      }, 80)
       timerRef.current = window.setTimeout(() => {
         if (mediaRef.current?.state === 'recording') mediaRef.current.stop()
       }, listenMs)
@@ -309,7 +321,7 @@ export default function SpeakDrill({ drills = [], voiceApi = null }) {
     return <p className="muted">{t.story.speakEmpty}</p>
   }
 
-  const statusLabel = modelPlaying
+  const statusLabel = modelPlaying || ttsBusy || ttsPlaying
     ? t.speak.playingModel
     : phase === 'listening'
       ? t.speak.listening
@@ -336,13 +348,15 @@ export default function SpeakDrill({ drills = [], voiceApi = null }) {
     return Math.max(0.12, Math.min(1, base + (isListening ? level * 0.35 : 0)))
   })
 
-  const micLocked = modelPlaying || ttsBusy || isScoring
+  const micLocked = modelPlaying || ttsBusy || ttsPlaying || isScoring
+  const modelActive = modelPlaying || ttsBusy || ttsPlaying
+  const voiceProgress = ttsBusy && !ttsPlaying ? 0 : playbackProgress
 
   return (
     <div
-      className={`speak-card speak-drill is-${phase}${modelPlaying ? ' is-playing' : ''}`}
+      className={`speak-card speak-drill is-${phase}${modelActive ? ' is-playing' : ''}`}
       aria-live="polite"
-      aria-busy={isListening || isScoring || modelPlaying}
+      aria-busy={isListening || isScoring || modelActive}
     >
       <p className="speak-progress" dir="ltr">
         {t.speak.sentence} {index + 1}/{safeDrills.length}
@@ -353,8 +367,8 @@ export default function SpeakDrill({ drills = [], voiceApi = null }) {
         {targetLine}
       </p>
 
-      <div className={`speak-stage is-${phase}${modelPlaying ? ' is-playing' : ''}`}>
-        <div className={`speak-status-pill is-${phase}${modelPlaying ? ' is-playing' : ''}`}>
+      <div className={`speak-stage is-${phase}${modelActive ? ' is-playing' : ''}`}>
+        <div className={`speak-status-pill is-${phase}${modelActive ? ' is-playing' : ''}`}>
           <span className="speak-status-dot" aria-hidden />
           <span>{statusLabel}</span>
           {isListening && (
@@ -363,6 +377,14 @@ export default function SpeakDrill({ drills = [], voiceApi = null }) {
             </strong>
           )}
         </div>
+
+        <VoicePlaybackBar
+          active={modelActive || isListening}
+          indeterminate={ttsBusy && !ttsPlaying}
+          value={isListening ? listenProgress : voiceProgress}
+          label={isListening ? t.speak.listening : t.speak.playingModel}
+          className="speak-voice-bar"
+        />
 
         <div className="speak-meter" aria-hidden>
           {bars.map((h, i) => (
@@ -407,7 +429,7 @@ export default function SpeakDrill({ drills = [], voiceApi = null }) {
         </button>
 
         <p className="speak-mic-caption">
-          {modelPlaying
+          {modelActive
             ? t.speak.playingModel
             : isListening
               ? t.speak.tapToStop
@@ -422,7 +444,7 @@ export default function SpeakDrill({ drills = [], voiceApi = null }) {
           type="button"
           className="btn btn-ghost"
           onClick={prevDrill}
-          disabled={isListening || isScoring || modelPlaying || safeDrills.length < 2}
+          disabled={isListening || isScoring || modelActive || safeDrills.length < 2}
         >
           {t.speak.prev}
         </button>
@@ -430,15 +452,15 @@ export default function SpeakDrill({ drills = [], voiceApi = null }) {
           type="button"
           className="btn btn-primary"
           onClick={playModel}
-          disabled={isListening || isScoring || modelPlaying || ttsBusy}
+          disabled={isListening || isScoring || modelActive}
         >
-          {modelPlaying || ttsBusy ? t.speak.playing : t.speak.listen}
+          {modelActive ? t.speak.playing : t.speak.listen}
         </button>
         <button
           type="button"
           className="btn btn-ghost"
           onClick={nextDrill}
-          disabled={isListening || isScoring || modelPlaying || safeDrills.length < 2}
+          disabled={isListening || isScoring || modelActive || safeDrills.length < 2}
         >
           {t.speak.next}
         </button>
