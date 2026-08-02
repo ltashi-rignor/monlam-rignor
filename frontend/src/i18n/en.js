@@ -953,7 +953,7 @@ export const en = {
     home: {
       seoTitle: 'Rignor · Learn Tibetan',
       seoDesc: 'Alphabet, vocabulary, grammar, and an AI tutor — start with Rignor.',
-      eyebrow: 'Rignor',
+
       lead: 'Read, write, and speak Tibetan with guided lessons and an AI tutor. Built for beginners and growing learners.',
       explorePrograms: 'Explore programs',
       featuresTitle: 'What you can learn',
